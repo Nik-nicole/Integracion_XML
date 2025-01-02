@@ -1,7 +1,7 @@
+# filepath: /E:/integracion/Integracion_XML/app/models/models.py
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Date
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
-from app.extensions import db
+from extensions import db
 
 class InformacionTerceros(db.Model):
     __tablename__ = 'informacion_terceros'
@@ -51,9 +51,3 @@ class Usuarios(db.Model):
 
     persona = relationship("Personas", backref="usuarios")
     rol = relationship("Roles", backref="usuarios")
-
-# Conexión a la base de datos (cambia 'sqlite:///test.db' por tu configuración)
-
-
-# Crear todas las tablas
-
