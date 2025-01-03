@@ -4,6 +4,8 @@ from flask_migrate import Migrate
 from extensions import db, migrate
 from config import Config
 from rutas.informacion_terceros import informacion_terceros  # Importa el Blueprint
+from rutas.personas import personas  # Importa el Blueprint
+from rutas.xml_upload import xml_upload_bp  # Importar el Blueprint
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -14,6 +16,12 @@ def create_app(config_class=Config):
 
     # Registrar el Blueprint
     app.register_blueprint(informacion_terceros)
+    
+    # Registrar el Blueprint
+    app.register_blueprint(personas)
+    
+    # Registrar el Blueprint de carga de XML
+    app.register_blueprint(xml_upload_bp)
 
     # Importar modelos para asegurarnos de que se reconocen durante las migraciones
     with app.app_context():

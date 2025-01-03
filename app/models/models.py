@@ -3,6 +3,8 @@ from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from extensions import db
 from app import db
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 class InformacionTerceros(db.Model):
     __tablename__ = 'informacion_terceros'
@@ -18,12 +20,12 @@ class InformacionTerceros(db.Model):
 
 class Personas(db.Model):
     __tablename__ = 'personas'
-    id_persona = Column(String(20), primary_key=True)
+    id_persona = Column(Integer, primary_key=True)  # id_persona es Integer
     primer_nombre = Column(String(20))
     primer_apellido = Column(String(20))
-    tipo_documento = Column(Integer)
-    numero_documento = Column(Integer)
-    telefono_contacto = Column(Integer)
+    tipo_documento = Column(String(10))  # Cambiado a String si el tipo de documento no es solo un número
+    numero_documento = Column(String(20))  # Cambiado a String para permitir caracteres como guiones
+    telefono_contacto = Column(String(20))  # Cambiado a String para permitir números con guiones
     email = Column(String(100))
 
 class Empresa(db.Model):
@@ -47,7 +49,7 @@ class Usuarios(db.Model):
     nombre_usuario = Column(String(50))
     password = Column(String(200))
     estado = Column(Boolean)
-    id_persona = Column(String(20), ForeignKey('personas.id_persona'))
+    id_persona = Column(Integer, ForeignKey('personas.id_persona'))  # Asegúrate de que sea Integer
     id_rol = Column(Integer, ForeignKey('roles.id_rol'))
 
     persona = relationship("Personas", backref="usuarios")
