@@ -13,8 +13,8 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Importar modelos para asegurarnos de que se reconocen durante las migraciones
     with app.app_context():
-        from .models import models  # Importa los modelos aquí
-        db.create_all()
+        from app.models import models  # Importa tus modelos
 
     return app

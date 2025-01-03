@@ -2,6 +2,7 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from extensions import db
+from app import db
 
 class InformacionTerceros(db.Model):
     __tablename__ = 'informacion_terceros'
