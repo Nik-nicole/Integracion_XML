@@ -1,4 +1,3 @@
-# filepath: /E:/integracion/Integracion_XML/config.py
 import os
 from dotenv import load_dotenv
 
@@ -6,5 +5,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql://postgres:ncl123@localhost/integracion")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
