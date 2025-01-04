@@ -5,6 +5,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cargar archivo XML</title>
+    <!-- Agregar CSS para DataTable -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
 </head>
 <body>
     <h2>Cargar archivo XML</h2>
@@ -14,5 +16,48 @@
         <br><br>
         <button type="submit">Cargar XML</button>
     </form>
+
+    {% if datos %}
+    <h2>Datos Extraídos</h2>
+    <form action="{{ url_for('xml_upload.export_data') }}" method="POST">
+        <table id="data-table" class="display">
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Nombre/Razón Social</th>
+                    <th>Tipo Persona</th>
+                    <th>Dirección</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th>Actividad Económica</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dato in datos %}
+                <tr>
+                    <td>{{ dato.identificacion }}</td>
+                    <td>{{ dato.nombre_razon_social }}</td>
+                    <td>{{ dato.tipo_persona }}</td>
+                    <td>{{ dato.direccion }}</td>
+                    <td>{{ dato.telefono }}</td>
+                    <td>{{ dato.email }}</td>
+                    <td>{{ dato.actividad_economica }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <button type="submit">Exportar a la Base de Datos</button>
+    </form>
+    {% endif %}
+
+    <!-- Agregar scripts para DataTable -->
+    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#data-table').DataTable();
+        });
+    </script>
 </body>
 </html>
