@@ -24,20 +24,32 @@ def upload_xml():
 
             # Procesar el archivo XML directamente desde la memoria
             try:
-                datos = parse_xml(file_content)
-                # Solo devolver los datos extraídos en formato JSON
-                return jsonify(datos)
+                datos, facturacion = parse_xml(file_content)
+                
+                # Imprimir los datos por consola
+                print_data(datos)
+                print("Facturación Extraída:")
+                for factura in facturacion:
+                    print(factura)
+                
+                # Redirigir a la página donde se mostrarán los datos
+                return render_template('upload_xml.html', datos=datos, facturacion=facturacion)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
     return render_template('upload_xml.html')
 
+@xml_upload_bp.route('/export_data', methods=['POST'])
+def export_data():
+    # Aquí puedes añadir la lógica para exportar los datos a la base de datos
+    datos = request.form.get('datos')
+    # Procesar y exportar los datos
+    return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
+
 def parse_xml(file_content):
-    # Procesar el archivo XML desde BytesIO
     tree = ET.parse(file_content)
     root = tree.getroot()
 
-    # Definir namespaces
     namespaces = {
         'cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
         'cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
@@ -45,165 +57,92 @@ def parse_xml(file_content):
         'sts': 'dian:gov:co:facturaelectronica:Structures-2-1'
     }
 
-    # Extraer información general del documento
-    general_info = {
-        'UBLVersionID': root.findtext('cbc:UBLVersionID', namespaces=namespaces),
-        'CustomizationID': root.findtext('cbc:CustomizationID', namespaces=namespaces),
-        'ProfileID': root.findtext('cbc:ProfileID', namespaces=namespaces),
-        'ProfileExecutionID': root.findtext('cbc:ProfileExecutionID', namespaces=namespaces),
-        'ID': root.findtext('cbc:ID', namespaces=namespaces),
-        'UUID': root.findtext('cbc:UUID', namespaces=namespaces),
-        'IssueDate': root.findtext('cbc:IssueDate', namespaces=namespaces),
-        'IssueTime': root.findtext('cbc:IssueTime', namespaces=namespaces),
-        'DueDate': root.findtext('cbc:DueDate', namespaces=namespaces),
-        'InvoiceTypeCode': root.findtext('cbc:InvoiceTypeCode', namespaces=namespaces),
-        'DocumentCurrencyCode': root.findtext('cbc:DocumentCurrencyCode', namespaces=namespaces),
-        'LineCountNumeric': root.findtext('cbc:LineCountNumeric', namespaces=namespaces)
-    }
+    datos = []
+    facturacion = []
 
-    # Extraer información del emisor (AccountingSupplierParty)
-    supplier_party = root.find('cac:AccountingSupplierParty', namespaces=namespaces)
-    supplier_info = extract_supplier_data(supplier_party, namespaces)
+    # Buscar el nodo <cbc:Description> que contiene el CDATA con el XML interno
+    description_node = root.find('.//cbc:Description', namespaces=namespaces)
+    if description_node is not None and description_node.text:
+        # Extraer el contenido CDATA
+        inner_xml_content = description_node.text.strip()
+        print("CDATA Content Extracted:\n", inner_xml_content)  # Imprimir el contenido CDATA extraído
 
-    # Extraer información del receptor (AccountingCustomerParty)
-    customer_party = root.find('cac:AccountingCustomerParty', namespaces=namespaces)
-    customer_info = extract_customer_data(customer_party, namespaces)
+        # Parsear el contenido CDATA como un nuevo XML
+        try:
+            inner_tree = ET.ElementTree(ET.fromstring(inner_xml_content))
+            inner_root = inner_tree.getroot()
 
-    # Extraer información de la línea de factura (InvoiceLine)
-    invoice_lines = []
-    for line in root.findall('cac:InvoiceLine', namespaces=namespaces):
-        invoice_lines.append(extract_invoice_line_data(line, namespaces))
+            # Extraer la información del emisor y receptor del XML interno
+            supplier_party = inner_root.find('cac:AccountingSupplierParty/cac:Party', namespaces=namespaces)
+            if supplier_party is not None:
+                print("Supplier Party found")
+            else:
+                print("Supplier Party not found")
+            supplier_info = extract_party_info(supplier_party, namespaces)
+            datos.append(supplier_info)
 
-    # Extraer información del documento adjunto (Attachment)
-    attachment = root.find('.//cbc:Description', namespaces=namespaces)
-    attachment_info = extract_attachment_data(attachment.text) if attachment is not None else {}
+            customer_party = inner_root.find('cac:AccountingCustomerParty/cac:Party', namespaces=namespaces)
+            if customer_party is not None:
+                print("Customer Party found")
+            else:
+                print("Customer Party not found")
+            customer_info = extract_party_info(customer_party, namespaces)
+            datos.append(customer_info)
 
-    return {
-        'general_info': general_info,
-        'supplier_info': supplier_info,
-        'customer_info': customer_info,
-        'invoice_lines': invoice_lines,
-        'attachment_info': attachment_info
-    }
+            # Extraer la información de facturación
+            tax_total = inner_root.find('cac:TaxTotal', namespaces=namespaces)
+            if tax_total is not None:
+                tax_amount = tax_total.findtext('cbc:TaxAmount', namespaces=namespaces)
+                facturacion.append({'campo': 'TaxAmount', 'valor': tax_amount})
+                print("Tax Amount found:", tax_amount)  # Depuración
 
-def extract_supplier_data(supplier_party, namespaces):
-    if supplier_party is None:
-        return {}
+            legal_monetary_total = inner_root.find('cac:LegalMonetaryTotal', namespaces=namespaces)
+            if legal_monetary_total is not None:
+                payable_amount = legal_monetary_total.findtext('cbc:PayableAmount', namespaces=namespaces)
+                facturacion.append({'campo': 'PayableAmount', 'valor': payable_amount})
+                print("Payable Amount found:", payable_amount)  # Depuración
 
-    party = supplier_party.find('cac:Party', namespaces=namespaces)
-    address = party.find('cac:PhysicalLocation/cac:Address', namespaces=namespaces)
-    contact = party.find('cac:Contact', namespaces=namespaces)
-    party_tax_scheme = party.find('cac:PartyTaxScheme', namespaces=namespaces)
-    party_legal_entity = party.find('cac:PartyLegalEntity', namespaces=namespaces)
-    registration_address = party_tax_scheme.find('cac:RegistrationAddress', namespaces=namespaces)
-    tax_scheme = party_tax_scheme.find('cac:TaxScheme', namespaces=namespaces)
-    corporate_registration_scheme = party_legal_entity.find('cac:CorporateRegistrationScheme', namespaces=namespaces)
+        except ET.ParseError as e:
+            print("Error parsing inner XML:", e)
+    else:
+        print("Description node not found or empty")
 
-    return {
-        'AdditionalAccountID': supplier_party.findtext('cbc:AdditionalAccountID', namespaces=namespaces),
-        'IndustryClassificationCode': supplier_party.findtext('cbc:IndustryClassificationCode', namespaces=namespaces),
-        'PartyName': party.findtext('cac:PartyName/cbc:Name', namespaces=namespaces),
-        'Address': {
-            'ID': address.findtext('cbc:ID', namespaces=namespaces) or '',
-            'CityName': address.findtext('cbc:CityName', namespaces=namespaces) or '',
-            'CountrySubentity': address.findtext('cbc:CountrySubentity', namespaces=namespaces) or '',
-            'CountrySubentityCode': address.findtext('cbc:CountrySubentityCode', namespaces=namespaces) or '',
-            'Line': address.findtext('cac:AddressLine/cbc:Line', namespaces=namespaces) or '',
-            'CountryIdentificationCode': address.findtext('cac:Country/cbc:IdentificationCode', namespaces=namespaces) or '',
-            'CountryName': address.findtext('cac:Country/cbc:Name', namespaces=namespaces) or ''
-        },
-        'PartyTaxScheme': {
-            'RegistrationName': party_tax_scheme.findtext('cbc:RegistrationName', namespaces=namespaces) or '',
-            'CompanyID': party_tax_scheme.findtext('cbc:CompanyID', namespaces=namespaces) or '',
-            'TaxLevelCode': party_tax_scheme.findtext('cbc:TaxLevelCode', namespaces=namespaces) or '',
-            'RegistrationAddress': {
-                'ID': registration_address.findtext('cbc:ID', namespaces=namespaces) or '',
-                'CityName': registration_address.findtext('cbc:CityName', namespaces=namespaces) or '',
-                'CountrySubentity': registration_address.findtext('cbc:CountrySubentity', namespaces=namespaces) or '',
-                'CountrySubentityCode': registration_address.findtext('cbc:CountrySubentityCode', namespaces=namespaces) or '',
-                'Line': registration_address.findtext('cac:AddressLine/cbc:Line', namespaces=namespaces) or '',
-                'CountryIdentificationCode': registration_address.findtext('cac:Country/cbc:IdentificationCode', namespaces=namespaces) or '',
-                'CountryName': registration_address.findtext('cac:Country/cbc:Name', namespaces=namespaces) or ''
-            },
-            'TaxScheme': {
-                'ID': tax_scheme.findtext('cbc:ID', namespaces=namespaces) or '',
-                'Name': tax_scheme.findtext('cbc:Name', namespaces=namespaces) or ''
-            }
-        },
-        'PartyLegalEntity': {
-            'RegistrationName': party_legal_entity.findtext('cbc:RegistrationName', namespaces=namespaces) or '',
-            'CompanyID': party_legal_entity.findtext('cbc:CompanyID', namespaces=namespaces) or '',
-            'CorporateRegistrationScheme': {
-                'ID': corporate_registration_scheme.findtext('cbc:ID', namespaces=namespaces) or ''
-            }
-        },
-        'Contact': {
-            'Telephone': contact.findtext('cbc:Telephone', namespaces=namespaces) or '',
-            'ElectronicMail': contact.findtext('cbc:ElectronicMail', namespaces=namespaces) or ''
+    return datos, facturacion
+
+def extract_party_info(party, namespaces):
+    if party is None:
+        return {
+            'identificacion': 'N/A',
+            'nombre_razon_social': 'N/A',
+            'tipo_persona': 'N/A',
+            'direccion': 'N/A',
+            'telefono': 'N/A',
+            'email': 'N/A',
+            'actividad_economica': 'N/A'
         }
+
+    info = {
+        'identificacion': party.findtext('.//cac:PartyTaxScheme/cbc:CompanyID', namespaces=namespaces),
+        'nombre_razon_social': party.findtext('.//cac:PartyTaxScheme/cbc:RegistrationName', namespaces=namespaces),
+        'tipo_persona': party.findtext('.//cbc:AdditionalAccountID', namespaces=namespaces),
+        'direccion': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:AddressLine/cbc:Line', namespaces=namespaces),
+        'telefono': party.findtext('.//cac:Contact/cbc:Telephone', namespaces=namespaces),
+        'email': party.findtext('.//cac:Contact/cbc:ElectronicMail', namespaces=namespaces),
+        'actividad_economica': party.findtext('.//cbc:IndustryClassificationCode', namespaces=namespaces)
     }
 
-def extract_customer_data(customer_party, namespaces):
-    if customer_party is None:
-        return {}
+    print("Extracted info:", info)  # Imprimir la información extraída por consola
 
-    party = customer_party.find('cac:Party', namespaces=namespaces)
-    address = party.find('cac:PhysicalLocation/cac:Address', namespaces=namespaces)
-    contact = party.find('cac:Contact', namespaces=namespaces)
-    party_tax_scheme = party.find('cac:PartyTaxScheme', namespaces=namespaces)
-    party_legal_entity = party.find('cac:PartyLegalEntity', namespaces=namespaces)
-    registration_address = party_tax_scheme.find('cac:RegistrationAddress', namespaces=namespaces)
-    tax_scheme = party_tax_scheme.find('cac:TaxScheme', namespaces=namespaces)
+    return info
 
-    return {
-        'AdditionalAccountID': customer_party.findtext('cbc:AdditionalAccountID', namespaces=namespaces),
-        'PartyName': party.findtext('cac:PartyName/cbc:Name', namespaces=namespaces),
-        'Address': {
-            'ID': address.findtext('cbc:ID', namespaces=namespaces) or '',
-            'CityName': address.findtext('cbc:CityName', namespaces=namespaces) or '',
-            'PostalZone': address.findtext('cbc:PostalZone', namespaces=namespaces) or '',
-            'CountrySubentity': address.findtext('cbc:CountrySubentity', namespaces=namespaces) or '',
-            'CountrySubentityCode': address.findtext('cbc:CountrySubentityCode', namespaces=namespaces) or '',
-            'Line': address.findtext('cac:AddressLine/cbc:Line', namespaces=namespaces) or '',
-            'CountryIdentificationCode': address.findtext('cac:Country/cbc:IdentificationCode', namespaces=namespaces) or '',
-            'CountryName': address.findtext('cac:Country/cbc:Name', namespaces=namespaces) or ''
-        },
-        'PartyTaxScheme': {
-            'RegistrationName': party_tax_scheme.findtext('cbc:RegistrationName', namespaces=namespaces) or '',
-            'CompanyID': party_tax_scheme.findtext('cbc:CompanyID', namespaces=namespaces) or '',
-            'TaxLevelCode': party_tax_scheme.findtext('cbc:TaxLevelCode', namespaces=namespaces) or '',
-            'RegistrationAddress': {
-                'ID': registration_address.findtext('cbc:ID', namespaces=namespaces) or '',
-                'CityName': registration_address.findtext('cbc:CityName', namespaces=namespaces) or '',
-                'CountrySubentity': registration_address.findtext('cbc:CountrySubentity', namespaces=namespaces) or '',
-                'CountrySubentityCode': registration_address.findtext('cbc:CountrySubentityCode', namespaces=namespaces) or '',
-                'Line': registration_address.findtext('cac:AddressLine/cbc:Line', namespaces=namespaces) or '',
-                'CountryIdentificationCode': registration_address.findtext('cac:Country/cbc:IdentificationCode', namespaces=namespaces) or '',
-                'CountryName': registration_address.findtext('cac:Country/cbc:Name', namespaces=namespaces) or ''
-            },
-            'TaxScheme': {
-                'ID': tax_scheme.findtext('cbc:ID', namespaces=namespaces) or '',
-                'Name': tax_scheme.findtext('cbc:Name', namespaces=namespaces) or ''
-            }
-        }
-    }
-
-def extract_invoice_line_data(line, namespaces):
-    return {
-        'ID': line.findtext('cbc:ID', namespaces=namespaces) or '',
-        'InvoicedQuantity': line.findtext('cbc:InvoicedQuantity', namespaces=namespaces) or '',
-        'LineExtensionAmount': line.findtext('cbc:LineExtensionAmount', namespaces=namespaces) or '',
-        'Item': {
-            'Name': line.findtext('cac:Item/cbc:Name', namespaces=namespaces) or '',
-            'Description': line.findtext('cac:Item/cbc:Description', namespaces=namespaces) or ''
-        },
-        'Price': {
-            'PriceAmount': line.findtext('cac:Price/cbc:PriceAmount', namespaces=namespaces) or '',
-            'BaseQuantity': line.findtext('cac:Price/cbc:BaseQuantity', namespaces=namespaces) or ''
-        }
-    }
-
-def extract_attachment_data(description_text):
-    return {
-        'Description': description_text or ''
-    }
+def print_data(datos):
+    print("Datos Extraídos:")
+    for dato in datos:
+        print("Identificación:", dato.get('identificacion', 'N/A'))
+        print("Nombre/Razón Social:", dato.get('nombre_razon_social', 'N/A'))
+        print("Tipo Persona:", dato.get('tipo_persona', 'N/A'))
+        print("Dirección:", dato.get('direccion', 'N/A'))
+        print("Teléfono:", dato.get('telefono', 'N/A'))
+        print("Email:", dato.get('email', 'N/A'))
+        print("Actividad Económica:", dato.get('actividad_economica', 'N/A'))
+        print("-------------------------------")

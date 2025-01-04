@@ -47,8 +47,27 @@
             </tbody>
         </table>
         <br>
-        <button type="submit">Exportar a la Base de Datos</button>
     </form>
+    {% endif %}
+
+    {% if facturacion %}
+    <h2>Información de Facturación</h2>
+    <table id="facturacion-table" class="display">
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Valor</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturacion %}
+            <tr>
+                <td>{{ factura.campo }}</td>
+                <td>{{ factura.valor }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% endif %}
 
     <!-- Agregar scripts para DataTable -->
@@ -57,6 +76,7 @@
     <script>
         $(document).ready(function() {
             $('#data-table').DataTable();
+            $('#facturacion-table').DataTable();
         });
     </script>
 </body>

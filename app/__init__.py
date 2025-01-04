@@ -33,7 +33,7 @@ def create_app(config_class=Config):
     app.register_blueprint(empresa)
     
     # Registrar el Blueprint de carga de XML
-    app.register_blueprint(xml_upload_bp)
+    app.register_blueprint(xml_upload_bp, url_prefix='/xml_upload')
 
     # Importar modelos para asegurarnos de que se reconocen durante las migraciones
     with app.app_context():
