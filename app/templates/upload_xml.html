@@ -17,9 +17,10 @@
         <button type="submit">Cargar XML</button>
     </form>
 
-    {% if datos %}
-    <h2>Datos Extraídos</h2>
-    <form action="{{ url_for('xml_upload.export_data') }}" method="POST">
+    {% if datos or facturacion %}
+    <form id="export-form" action="{{ url_for('xml_upload.export_data') }}" method="POST">
+        {% if datos %}
+        <h2>Datos Extraídos</h2>
         <table id="data-table" class="display">
             <thead>
                 <tr>
@@ -47,27 +48,62 @@
             </tbody>
         </table>
         <br>
-    </form>
-    {% endif %}
+        <input type="hidden" name="datos" value="{{ datos|tojson | escape }}">
+        {% endif %}
 
-    {% if facturacion %}
-    <h2>Información de Facturación</h2>
-    <table id="facturacion-table" class="display">
-        <thead>
-            <tr>
-                <th>Campo</th>
-                <th>Valor</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for factura in facturacion %}
-            <tr>
-                <td>{{ factura.campo }}</td>
-                <td>{{ factura.valor }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        {% if facturacion %}
+        <h2>Información de Facturación</h2>
+        <table id="facturacion-table" class="display">
+            <thead>
+                <tr>
+                    <th>Campo</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturacion %}
+                <tr>
+                    <td>{{ factura.campo }}</td>
+                    <td>{{ factura.valor }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <script>
+            // Datos principales
+            {% if datos is not none %}
+                console.log("Datos Principales:", {{ datos|tojson }});
+                {{ datos|tojson }}.forEach((item, index) => {
+                    console.log(`Registro ${index + 1}:`);
+                    console.log("Identificación:", item.identificacion);
+                    console.log("Nombre/Razón Social:", item.nombre_razon_social);
+                    console.log("Teléfono:", item.telefono);
+                    console.log("Email:", item.email);
+                });
+            {% else %}
+                console.log("No hay datos principales disponibles.");
+            {% endif %}
+        
+            // Información de facturación
+            {% if facturacion is not none %}
+                console.log("Información de Facturación:");
+                const facturacion = {{ facturacion|tojson }};
+                console.log("Monto a Pagar:", facturacion.monto_pagar);
+                console.log("Monto de Impuestos:", facturacion.monto_impuestos);
+                console.log("Monto Pre-Pagado:", facturacion.monto_pre_pagado);
+                console.log("Monto Total Con Impuestos:", facturacion.monto_total_con_impuestos);
+                console.log("Monto Total de Líneas:", facturacion.monto_total_lineas);
+                console.log("Monto Total Sin Impuestos:", facturacion.monto_total_sin_impuestos);
+            {% else %}
+                console.log("No hay información de facturación disponible.");
+            {% endif %}
+        </script>
+        <br>
+        <input type="hidden" name="facturacion" value="{{ facturacion|tojson | escape }}">
+        {% endif %}
+
+        <button type="submit" form="export-form">Guardar en BD</button>
+    </form>
     {% endif %}
 
     <!-- Agregar scripts para DataTable -->

@@ -1,6 +1,9 @@
 import xml.etree.ElementTree as ET
 from flask import Blueprint, request, jsonify, render_template
 from io import BytesIO
+from app import db
+from app.models.models import Empresa, InformacionTerceros, Facturacion
+import json
 
 # Crear el Blueprint
 xml_upload_bp = Blueprint('xml_upload', __name__)
@@ -41,9 +44,20 @@ def upload_xml():
 
 @xml_upload_bp.route('/export_data', methods=['POST'])
 def export_data():
-    # Aquí puedes añadir la lógica para exportar los datos a la base de datos
+    # Obtener los datos del formulario
     datos = request.form.get('datos')
-    # Procesar y exportar los datos
+    facturacion = request.form.get('facturacion')
+    
+    # Convertir los datos JSON a diccionarios de Python
+    try:
+        datos = json.loads(datos)
+        facturacion = json.loads(facturacion)
+    except json.JSONDecodeError as e:
+        return jsonify({'status': 'error', 'message': f'Error al decodificar JSON: {str(e)}'}), 400
+    
+    # Guardar los datos en la base de datos
+    save_to_db(datos, facturacion)
+    
     return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
 
 def parse_xml(file_content):
@@ -93,13 +107,27 @@ def parse_xml(file_content):
             tax_total = inner_root.find('cac:TaxTotal', namespaces=namespaces)
             if tax_total is not None:
                 tax_amount = tax_total.findtext('cbc:TaxAmount', namespaces=namespaces)
-                facturacion.append({'campo': 'TaxAmount', 'valor': tax_amount})
+                facturacion.append({'campo': 'Monto de Impuestos', 'valor': tax_amount})
                 print("Tax Amount found:", tax_amount)  # Depuración
 
             legal_monetary_total = inner_root.find('cac:LegalMonetaryTotal', namespaces=namespaces)
             if legal_monetary_total is not None:
+                line_extension_amount = legal_monetary_total.findtext('cbc:LineExtensionAmount', namespaces=namespaces)
+                tax_exclusive_amount = legal_monetary_total.findtext('cbc:TaxExclusiveAmount', namespaces=namespaces)
+                tax_inclusive_amount = legal_monetary_total.findtext('cbc:TaxInclusiveAmount', namespaces=namespaces)
+                prepaid_amount = legal_monetary_total.findtext('cbc:PrepaidAmount', namespaces=namespaces)
                 payable_amount = legal_monetary_total.findtext('cbc:PayableAmount', namespaces=namespaces)
-                facturacion.append({'campo': 'PayableAmount', 'valor': payable_amount})
+
+                facturacion.append({'campo': 'Monto Total de Líneas', 'valor': line_extension_amount})
+                facturacion.append({'campo': 'Monto Total Sin Impuestos', 'valor': tax_exclusive_amount})
+                facturacion.append({'campo': 'Monto Total Con Impuestos', 'valor': tax_inclusive_amount})
+                facturacion.append({'campo': 'Monto Pre-Pagado', 'valor': prepaid_amount})
+                facturacion.append({'campo': 'Monto a Pagar', 'valor': payable_amount})
+
+                print("Line Extension Amount found:", line_extension_amount)  # Depuración
+                print("Tax Exclusive Amount found:", tax_exclusive_amount)  # Depuración
+                print("Tax Inclusive Amount found:", tax_inclusive_amount)  # Depuración
+                print("Prepaid Amount found:", prepaid_amount)  # Depuración
                 print("Payable Amount found:", payable_amount)  # Depuración
 
         except ET.ParseError as e:
@@ -124,11 +152,11 @@ def extract_party_info(party, namespaces):
     info = {
         'identificacion': party.findtext('.//cac:PartyTaxScheme/cbc:CompanyID', namespaces=namespaces),
         'nombre_razon_social': party.findtext('.//cac:PartyTaxScheme/cbc:RegistrationName', namespaces=namespaces),
-        'tipo_persona': party.findtext('.//cbc:AdditionalAccountID', namespaces=namespaces),
+        'tipo_persona': party.findtext('../cbc:AdditionalAccountID', namespaces=namespaces),
         'direccion': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:AddressLine/cbc:Line', namespaces=namespaces),
         'telefono': party.findtext('.//cac:Contact/cbc:Telephone', namespaces=namespaces),
         'email': party.findtext('.//cac:Contact/cbc:ElectronicMail', namespaces=namespaces),
-        'actividad_economica': party.findtext('.//cbc:IndustryClassificationCode', namespaces=namespaces)
+        'actividad_economica': party.findtext('.//cac:PartyTaxScheme/cbc:IndustryClassificationCode', namespaces=namespaces)
     }
 
     print("Extracted info:", info)  # Imprimir la información extraída por consola
@@ -146,3 +174,31 @@ def print_data(datos):
         print("Email:", dato.get('email', 'N/A'))
         print("Actividad Económica:", dato.get('actividad_economica', 'N/A'))
         print("-------------------------------")
+
+def save_to_db(datos, facturacion):
+    try:
+        for dato in datos:
+            empresa = Empresa(
+                registration_name=dato['nombre_razon_social'],
+                company_id=dato['identificacion'],
+                tax_level_code=dato['tipo_persona'],
+                address=dato['direccion'],
+                telephone=dato['telefono'],
+                electronic_mail=dato['email']
+            )
+            db.session.add(empresa)
+
+        for factura in facturacion:
+            fact = Facturacion(
+                campo=factura['campo'],
+                valor=factura['valor']
+            )
+            db.session.add(fact)
+
+        db.session.commit()
+
+    except Exception as e:
+        print(f"Error al guardar en la base de datos: {e}")
+        db.session.rollback()
+    finally:
+        db.session.close()
