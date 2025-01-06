@@ -35,6 +35,9 @@ def upload_xml():
                 for factura in facturacion:
                     print(factura)
                 
+                # Guardar los datos en la base de datos
+                save_to_db(datos, facturacion)
+                
                 # Redirigir a la página donde se mostrarán los datos
                 return render_template('upload_xml.html', datos=datos, facturacion=facturacion)
             except Exception as e:
@@ -48,6 +51,10 @@ def export_data():
     datos = request.form.get('datos')
     facturacion = request.form.get('facturacion')
     
+    # Verificar si los datos están presentes
+    if not datos or not facturacion:
+        return jsonify({'status': 'error', 'message': 'Datos o facturación no proporcionados'}), 400
+
     # Convertir los datos JSON a diccionarios de Python
     try:
         datos = json.loads(datos)
@@ -88,18 +95,10 @@ def parse_xml(file_content):
 
             # Extraer la información del emisor y receptor del XML interno
             supplier_party = inner_root.find('cac:AccountingSupplierParty/cac:Party', namespaces=namespaces)
-            if supplier_party is not None:
-                print("Supplier Party found")
-            else:
-                print("Supplier Party not found")
             supplier_info = extract_party_info(supplier_party, namespaces)
             datos.append(supplier_info)
 
             customer_party = inner_root.find('cac:AccountingCustomerParty/cac:Party', namespaces=namespaces)
-            if customer_party is not None:
-                print("Customer Party found")
-            else:
-                print("Customer Party not found")
             customer_info = extract_party_info(customer_party, namespaces)
             datos.append(customer_info)
 
@@ -108,7 +107,6 @@ def parse_xml(file_content):
             if tax_total is not None:
                 tax_amount = tax_total.findtext('cbc:TaxAmount', namespaces=namespaces)
                 facturacion.append({'campo': 'Monto de Impuestos', 'valor': tax_amount})
-                print("Tax Amount found:", tax_amount)  # Depuración
 
             legal_monetary_total = inner_root.find('cac:LegalMonetaryTotal', namespaces=namespaces)
             if legal_monetary_total is not None:
@@ -124,14 +122,17 @@ def parse_xml(file_content):
                 facturacion.append({'campo': 'Monto Pre-Pagado', 'valor': prepaid_amount})
                 facturacion.append({'campo': 'Monto a Pagar', 'valor': payable_amount})
 
-                print("Line Extension Amount found:", line_extension_amount)  # Depuración
-                print("Tax Exclusive Amount found:", tax_exclusive_amount)  # Depuración
-                print("Tax Inclusive Amount found:", tax_inclusive_amount)  # Depuración
-                print("Prepaid Amount found:", prepaid_amount)  # Depuración
-                print("Payable Amount found:", payable_amount)  # Depuración
+            # Extraer la información del nodo <cbc:Note>
+            note_node = inner_root.find('.//cbc:Note', namespaces=namespaces)
+            if note_node is not None and note_node.text:
+                # Extraer el contenido de <cbc:Note> y colocarlo como 'valor'
+                facturacion.append({'campo': 'Curso de Excel Intermedio', 'valor': note_node.text.strip()})
+                print("Note Content found:", note_node.text.strip())
 
         except ET.ParseError as e:
             print("Error parsing inner XML:", e)
+        except Exception as e:
+            print("Unexpected error:", e)
     else:
         print("Description node not found or empty")
 

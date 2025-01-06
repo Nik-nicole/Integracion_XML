@@ -1,8 +1,8 @@
-"""Actualización esquema BD, agregando tablas.
+"""Descripción de la migración
 
-Revision ID: 63f8370e8c7c
+Revision ID: 50431717256a
 Revises: 
-Create Date: 2025-01-04 13:58:30.329577
+Create Date: 2025-01-06 14:53:27.003276
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '63f8370e8c7c'
+revision = '50431717256a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -72,7 +72,7 @@ def upgrade():
     sa.Column('customization_id', sa.String(length=50), nullable=True),
     sa.Column('profile_id', sa.String(length=255), nullable=True),
     sa.Column('profile_execution_id', sa.String(length=50), nullable=True),
-    sa.Column('document_id', sa.String(length=50), nullable=True),
+    sa.Column('document_id', sa.String(length=255), nullable=True),
     sa.Column('uuid', sa.String(length=255), nullable=True),
     sa.Column('issue_date', sa.Date(), nullable=True),
     sa.Column('issue_time', sa.Time(), nullable=True),
