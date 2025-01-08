@@ -37,6 +37,8 @@ def upload_xml():
                 
                 # Guardar los datos en la base de datos
                 save_to_db(datos, facturacion)
+                datos = json.dumps(datos)
+                facturacion = json.dumps(facturacion)
                 
                 # Redirigir a la página donde se mostrarán los datos
                 return render_template('upload_xml.html', datos=datos, facturacion=facturacion)

@@ -2,6 +2,7 @@ from flask import Flask
 from config import Config
 from extensions import db, migrate
 from rutas.informacion_terceros import informacion_terceros
+from rutas.xml_upload import xml_upload_bp
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -13,5 +14,8 @@ def create_app(config_class=Config):
     
     # Register blueprints
     app.register_blueprint(informacion_terceros)
+    
+    # Register the XML upload blueprint
+    app.register_blueprint(xml_upload_bp)
     
     return app
