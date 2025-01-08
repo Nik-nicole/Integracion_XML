@@ -4,6 +4,7 @@ from io import BytesIO
 from app import db
 from app.models.models import Empresa, InformacionTerceros, Facturacion
 import json
+from markupsafe import Markup
 
 # Crear el Blueprint
 xml_upload_bp = Blueprint('xml_upload', __name__)
@@ -35,13 +36,13 @@ def upload_xml():
                 for factura in facturacion:
                     print(factura)
                 
-                # Guardar los datos en la base de datos
-                save_to_db(datos, facturacion)
-                datos = json.dumps(datos)
-                facturacion = json.dumps(facturacion)
+                # Convertir los datos a JSON y devolverlos como respuesta
+                response_data = {
+                    'datos': datos,
+                    'facturacion': facturacion
+                }
+                return jsonify(response_data)
                 
-                # Redirigir a la página donde se mostrarán los datos
-                return render_template('upload_xml.html', datos=datos, facturacion=facturacion)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
@@ -64,10 +65,15 @@ def export_data():
     except json.JSONDecodeError as e:
         return jsonify({'status': 'error', 'message': f'Error al decodificar JSON: {str(e)}'}), 400
     
-    # Guardar los datos en la base de datos
-    save_to_db(datos, facturacion)
-    
-    return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
+    # Enviar los datos como respuesta en formato JSON sin guardar en la base de datos
+    response_data = {
+        'status': 'success',
+        'message': 'Datos exportados correctamente',
+        'datos': datos,
+        'facturacion': facturacion
+    }
+
+    return jsonify(response_data)
 
 def parse_xml(file_content):
     tree = ET.parse(file_content)
@@ -130,6 +136,21 @@ def parse_xml(file_content):
                 # Extraer el contenido de <cbc:Note> y colocarlo como 'valor'
                 facturacion.append({'campo': 'Curso de Excel Intermedio', 'valor': note_node.text.strip()})
                 print("Note Content found:", note_node.text.strip())
+                
+            price_amount = inner_root.find('.//cbc:PriceAmount', namespaces=namespaces)
+            if price_amount is not None:
+                facturacion.append({'Precio': 'Costo individual', 'valor': price_amount.text.strip()})
+                print("Price Amount found:", price_amount.text.strip())
+                
+            descripcion_producto = inner_root.find('.//cbc:Description', namespaces=namespaces)
+            if descripcion_producto is not None:
+                facturacion.append({'Descripcion Producto': descripcion_producto.text.strip()})
+                print("Producto Encontrado:", descripcion_producto.text.strip())
+                
+            codigo_producto = inner_root.find('cac:StandardItemIdentification', namespaces=namespaces)
+            if codigo_producto is not None:
+                facturacion.append({'Codigo Producto': 'Codigo', 'valor': codigo_producto.text.strip()})
+                print("Codigo Producto Encontrado:", codigo_producto.text.strip())
 
         except ET.ParseError as e:
             print("Error parsing inner XML:", e)
