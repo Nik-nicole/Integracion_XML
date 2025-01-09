@@ -28,20 +28,19 @@ def upload_xml():
 
             # Procesar el archivo XML directamente desde la memoria
             try:
-                datos, facturacion = parse_xml(file_content)
+                datos, facturacion, productos = parse_xml(file_content)
                 
                 # Imprimir los datos por consola
                 print_data(datos)
                 print("Facturación Extraída:")
                 for factura in facturacion:
                     print(factura)
+                print("Productos Extraídos:")
+                for producto in productos:
+                    print(producto)
                 
-                # Convertir los datos a JSON y devolverlos como respuesta
-                response_data = {
-                    'datos': datos,
-                    'facturacion': facturacion
-                }
-                return jsonify(response_data)
+                # Renderizar la plantilla con los datos extraídos
+                return render_template('upload_xml.html', datos=datos, facturacion=facturacion, productos=productos)
                 
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -53,15 +52,17 @@ def export_data():
     # Obtener los datos del formulario
     datos = request.form.get('datos')
     facturacion = request.form.get('facturacion')
+    productos = request.form.get('productos')
     
     # Verificar si los datos están presentes
-    if not datos or not facturacion:
-        return jsonify({'status': 'error', 'message': 'Datos o facturación no proporcionados'}), 400
+    if not datos or not facturacion or not productos:
+        return jsonify({'status': 'error', 'message': 'Datos, facturación o productos no proporcionados'}), 400
 
     # Convertir los datos JSON a diccionarios de Python
     try:
         datos = json.loads(datos)
         facturacion = json.loads(facturacion)
+        productos = json.loads(productos)
     except json.JSONDecodeError as e:
         return jsonify({'status': 'error', 'message': f'Error al decodificar JSON: {str(e)}'}), 400
     
@@ -70,7 +71,8 @@ def export_data():
         'status': 'success',
         'message': 'Datos exportados correctamente',
         'datos': datos,
-        'facturacion': facturacion
+        'facturacion': facturacion,
+        'productos': productos
     }
 
     return jsonify(response_data)
@@ -88,6 +90,7 @@ def parse_xml(file_content):
 
     datos = []
     facturacion = []
+    productos = []
 
     # Buscar el nodo <cbc:Description> que contiene el CDATA con el XML interno
     description_node = root.find('.//cbc:Description', namespaces=namespaces)
@@ -139,18 +142,54 @@ def parse_xml(file_content):
                 
             price_amount = inner_root.find('.//cbc:PriceAmount', namespaces=namespaces)
             if price_amount is not None:
-                facturacion.append({'Precio': 'Costo individual', 'valor': price_amount.text.strip()})
+                facturacion.append({'campo': 'Costo individual', 'valor': price_amount.text.strip()})
                 print("Price Amount found:", price_amount.text.strip())
                 
             descripcion_producto = inner_root.find('.//cbc:Description', namespaces=namespaces)
             if descripcion_producto is not None:
-                facturacion.append({'Descripcion Producto': descripcion_producto.text.strip()})
+                facturacion.append({'campo': 'Descripcion Producto', 'valor': descripcion_producto.text.strip()})
                 print("Producto Encontrado:", descripcion_producto.text.strip())
                 
-            codigo_producto = inner_root.find('cac:StandardItemIdentification', namespaces=namespaces)
+            # Extraer el código del producto
+            codigo_producto = inner_root.find('.//cac:StandardItemIdentification/cbc:ID', namespaces=namespaces)
             if codigo_producto is not None:
-                facturacion.append({'Codigo Producto': 'Codigo', 'valor': codigo_producto.text.strip()})
-                print("Codigo Producto Encontrado:", codigo_producto.text.strip())
+                facturacion.append({'campo': 'Código Producto', 'valor': codigo_producto.text.strip()})
+                print("Código Producto Encontrado:", codigo_producto.text.strip())
+
+            # Extraer el valor de la retención en la fuente
+            withholding_tax_total = inner_root.find('.//cac:WithholdingTaxTotal/cbc:TaxAmount', namespaces=namespaces)
+            if withholding_tax_total is not None:
+                facturacion.append({'campo': 'Retención en la Fuente', 'valor': withholding_tax_total.text.strip()})
+                print("Retención en la Fuente Encontrada:", withholding_tax_total.text.strip())
+
+            # Extraer la información de los productos
+            invoice_lines = inner_root.findall('.//cac:InvoiceLine', namespaces=namespaces)
+            for line in invoice_lines:
+                nro = line.findtext('cbc:ID', namespaces=namespaces)
+                codigo = line.findtext('.//cac:StandardItemIdentification/cbc:ID', namespaces=namespaces)
+                descripcion = line.findtext('.//cbc:Description', namespaces=namespaces)
+                um = line.findtext('.//cbc:BaseQuantity', namespaces=namespaces)
+                cantidad = line.findtext('.//cbc:InvoicedQuantity', namespaces=namespaces)
+                precio_unitario = line.findtext('.//cbc:PriceAmount', namespaces=namespaces)
+                precio_venta = line.findtext('.//cbc:LineExtensionAmount', namespaces=namespaces)
+                descuento_detalle = '0.00'  # Asumimos que no hay descuento detalle
+                recargo_detalle = '0.00'  # Asumimos que no hay recargo detalle
+                iva = line.findtext('.//cac:TaxTotal/cbc:TaxAmount', namespaces=namespaces)
+                inc = '0.00'  # Asumimos que no hay INC
+
+                productos.append({
+                    'nro': nro,
+                    'codigo': codigo,
+                    'descripcion': descripcion,
+                    'um': um,
+                    'cantidad': cantidad,
+                    'precio_unitario': precio_unitario,
+                    'precio_venta': precio_venta,
+                    'descuento_detalle': descuento_detalle,
+                    'recargo_detalle': recargo_detalle,
+                    'iva': iva,
+                    'inc': inc
+                })
 
         except ET.ParseError as e:
             print("Error parsing inner XML:", e)
@@ -159,28 +198,36 @@ def parse_xml(file_content):
     else:
         print("Description node not found or empty")
 
-    return datos, facturacion
+    return datos, facturacion, productos
 
 def extract_party_info(party, namespaces):
     if party is None:
         return {
-            'identificacion': 'N/A',
-            'nombre_razon_social': 'N/A',
-            'tipo_persona': 'N/A',
-            'direccion': 'N/A',
-            'telefono': 'N/A',
-            'email': 'N/A',
-            'actividad_economica': 'N/A'
+            'registration_name': 'N/A',
+            'company_id': 'N/A',
+            'tax_level_code': 'N/A',
+            'address': 'N/A',
+            'city_name': 'N/A',
+            'country_subentity': 'N/A',
+            'country_subentity_code': 'N/A',
+            'country': 'N/A',
+            'country_name': 'N/A',
+            'telephone': 'N/A',
+            'electronic_mail': 'N/A'
         }
 
     info = {
-        'identificacion': party.findtext('.//cac:PartyTaxScheme/cbc:CompanyID', namespaces=namespaces),
-        'nombre_razon_social': party.findtext('.//cac:PartyTaxScheme/cbc:RegistrationName', namespaces=namespaces),
-        'tipo_persona': party.findtext('../cbc:AdditionalAccountID', namespaces=namespaces),
-        'direccion': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:AddressLine/cbc:Line', namespaces=namespaces),
-        'telefono': party.findtext('.//cac:Contact/cbc:Telephone', namespaces=namespaces),
-        'email': party.findtext('.//cac:Contact/cbc:ElectronicMail', namespaces=namespaces),
-        'actividad_economica': party.findtext('.//cac:PartyTaxScheme/cbc:IndustryClassificationCode', namespaces=namespaces)
+        'registration_name': party.findtext('.//cac:PartyTaxScheme/cbc:RegistrationName', namespaces=namespaces),
+        'company_id': party.findtext('.//cac:PartyTaxScheme/cbc:CompanyID', namespaces=namespaces),
+        'tax_level_code': party.findtext('.//cac:PartyTaxScheme/cbc:TaxLevelCode', namespaces=namespaces),
+        'address': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:AddressLine/cbc:Line', namespaces=namespaces),
+        'city_name': party.findtext('.//cac:PhysicalLocation/cac:Address/cbc:CityName', namespaces=namespaces),
+        'country_subentity': party.findtext('.//cac:PhysicalLocation/cac:Address/cbc:CountrySubentity', namespaces=namespaces),
+        'country_subentity_code': party.findtext('.//cac:PhysicalLocation/cac:Address/cbc:CountrySubentityCode', namespaces=namespaces),
+        'country': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:Country/cbc:IdentificationCode', namespaces=namespaces),
+        'country_name': party.findtext('.//cac:PhysicalLocation/cac:Address/cac:Country/cbc:Name', namespaces=namespaces),
+        'telephone': party.findtext('.//cac:Contact/cbc:Telephone', namespaces=namespaces),
+        'electronic_mail': party.findtext('.//cac:Contact/cbc:ElectronicMail', namespaces=namespaces)
     }
 
     print("Extracted info:", info)  # Imprimir la información extraída por consola
@@ -190,25 +237,34 @@ def extract_party_info(party, namespaces):
 def print_data(datos):
     print("Datos Extraídos:")
     for dato in datos:
-        print("Identificación:", dato.get('identificacion', 'N/A'))
-        print("Nombre/Razón Social:", dato.get('nombre_razon_social', 'N/A'))
-        print("Tipo Persona:", dato.get('tipo_persona', 'N/A'))
-        print("Dirección:", dato.get('direccion', 'N/A'))
-        print("Teléfono:", dato.get('telefono', 'N/A'))
-        print("Email:", dato.get('email', 'N/A'))
-        print("Actividad Económica:", dato.get('actividad_economica', 'N/A'))
+        print("Identificación:", dato.get('company_id', 'N/A'))
+        print("Nombre/Razón Social:", dato.get('registration_name', 'N/A'))
+        print("Tipo Persona:", dato.get('tax_level_code', 'N/A'))
+        print("Dirección:", dato.get('address', 'N/A'))
+        print("Ciudad:", dato.get('city_name', 'N/A'))
+        print("Subentidad del País:", dato.get('country_subentity', 'N/A'))
+        print("Código de Subentidad del País:", dato.get('country_subentity_code', 'N/A'))
+        print("País:", dato.get('country', 'N/A'))
+        print("Nombre del País:", dato.get('country_name', 'N/A'))
+        print("Teléfono:", dato.get('telephone', 'N/A'))
+        print("Email:", dato.get('electronic_mail', 'N/A'))
         print("-------------------------------")
 
 def save_to_db(datos, facturacion):
     try:
         for dato in datos:
-            empresa = Empresa(
-                registration_name=dato['nombre_razon_social'],
-                company_id=dato['identificacion'],
-                tax_level_code=dato['tipo_persona'],
-                address=dato['direccion'],
-                telephone=dato['telefono'],
-                electronic_mail=dato['email']
+            empresa = InformacionTerceros(
+                registration_name=dato['registration_name'],
+                company_id=dato['company_id'],
+                tax_level_code=dato['tax_level_code'],
+                address=dato['address'],
+                city_name=dato['city_name'],
+                country_subentity=dato['country_subentity'],
+                country_subentity_code=dato['country_subentity_code'],
+                country=dato['country'],
+                country_name=dato['country_name'],
+                telephone=dato['telephone'],
+                electronic_mail=dato['electronic_mail']
             )
             db.session.add(empresa)
 

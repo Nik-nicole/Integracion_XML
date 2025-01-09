@@ -1,3 +1,4 @@
+<!-- filepath: /e:/integracion/Integracion_XML/app/templates/upload_xml.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -28,6 +29,11 @@
                     <th>Nombre/Razón Social</th>
                     <th>Tipo Persona</th>
                     <th>Dirección</th>
+                    <th>Ciudad</th>
+                    <th>Subentidad del País</th>
+                    <th>Código de Subentidad del País</th>
+                    <th>País</th>
+                    <th>Nombre del País</th>
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th>Actividad Económica</th>
@@ -36,12 +42,17 @@
             <tbody>
                 {% for dato in datos %}
                 <tr>
-                    <td>{{ dato.identificacion }}</td>
-                    <td>{{ dato.nombre_razon_social }}</td>
-                    <td>{{ dato.tipo_persona }}</td>
-                    <td>{{ dato.direccion }}</td>
-                    <td>{{ dato.telefono }}</td>
-                    <td>{{ dato.email }}</td>
+                    <td>{{ dato.company_id }}</td>
+                    <td>{{ dato.registration_name }}</td>
+                    <td>{{ dato.tax_level_code }}</td>
+                    <td>{{ dato.address }}</td>
+                    <td>{{ dato.city_name }}</td>
+                    <td>{{ dato.country_subentity }}</td>
+                    <td>{{ dato.country_subentity_code }}</td>
+                    <td>{{ dato.country }}</td>
+                    <td>{{ dato.country_name }}</td>
+                    <td>{{ dato.telephone }}</td>
+                    <td>{{ dato.electronic_mail }}</td>
                     <td>{{ dato.actividad_economica }}</td>
                 </tr>
                 {% endfor %}
@@ -51,9 +62,48 @@
         <input type="hidden" name="datos" value="{{ datos|tojson | escape }}">
         {% endif %}
 
+        {% if productos %}
+        <h2>Detalles de Productos</h2>
+        <table id="productos-table" class="display">
+            <thead>
+                <tr>
+                    <th>Nro.</th>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th>U/M</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Precio de venta</th>
+                    <th>Descuento detalle</th>
+                    <th>Recargo detalle</th>
+                    <th>IVA %</th>
+                    <th>INC %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for producto in productos %}
+                <tr>
+                    <td>{{ producto.nro }}</td>
+                    <td>{{ producto.codigo }}</td>
+                    <td>{{ producto.descripcion }}</td>
+                    <td>{{ producto.um }}</td>
+                    <td>{{ producto.cantidad }}</td>
+                    <td>{{ producto.precio_unitario }}</td>
+                    <td>{{ producto.precio_venta }}</td>
+                    <td>{{ producto.descuento_detalle }}</td>
+                    <td>{{ producto.recargo_detalle }}</td>
+                    <td>{{ producto.iva }}</td>
+                    <td>{{ producto.inc }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        {% endif %}
+
         {% if facturacion %}
         <h2>Información de Facturación</h2>
-        <table id="facturacion-table" class="display">
+        <table id="informacion-facturacion-table" class="display">
             <thead>
                 <tr>
                     <th>Campo</th>
@@ -62,42 +112,15 @@
             </thead>
             <tbody>
                 {% for factura in facturacion %}
+                {% if factura.campo != 'Producto' and factura.campo != 'Código Producto' and factura.campo != 'Descripcion Producto' %}
                 <tr>
                     <td>{{ factura.campo }}</td>
                     <td>{{ factura.valor }}</td>
                 </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
-        <script>
-            // Datos principales
-            {% if datos is not none %}
-                console.log("Datos Principales:", {{ datos|tojson }});
-                {{ datos|tojson }}.forEach((item, index) => {
-                    console.log(`Registro ${index + 1}:`);
-                    console.log("Identificación:", item.identificacion);
-                    console.log("Nombre/Razón Social:", item.nombre_razon_social);
-                    console.log("Teléfono:", item.telefono);
-                    console.log("Email:", item.email);
-                });
-            {% else %}
-                console.log("No hay datos principales disponibles.");
-            {% endif %}
-        
-            // Información de facturación
-            {% if facturacion is not none %}
-                console.log("Información de Facturación:");
-                const facturacion = {{ facturacion|tojson }};
-                console.log("Monto a Pagar:", facturacion.monto_pagar);
-                console.log("Monto de Impuestos:", facturacion.monto_impuestos);
-                console.log("Monto Pre-Pagado:", facturacion.monto_pre_pagado);
-                console.log("Monto Total Con Impuestos:", facturacion.monto_total_con_impuestos);
-                console.log("Monto Total de Líneas:", facturacion.monto_total_lineas);
-                console.log("Monto Total Sin Impuestos:", facturacion.monto_total_sin_impuestos);
-            {% else %}
-                console.log("No hay información de facturación disponible.");
-            {% endif %}
-        </script>
         <br>
         <input type="hidden" name="facturacion" value="{{ facturacion|tojson | escape }}">
         {% endif %}
@@ -112,7 +135,8 @@
     <script>
         $(document).ready(function() {
             $('#data-table').DataTable();
-            $('#facturacion-table').DataTable();
+            $('#productos-table').DataTable();
+            $('#informacion-facturacion-table').DataTable();
         });
     </script>
 </body>
