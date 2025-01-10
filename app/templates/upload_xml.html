@@ -122,7 +122,9 @@
             </tbody>
         </table>
         <br>
-        <input type="hidden" name="facturacion" value="{{ facturacion|tojson | escape }}">
+        <input type="hidden" name="datos" value='{{ datos|tojson|safe }}'>
+        <input type="hidden" name="facturacion" value='{{ facturacion|tojson|safe }}'>
+        <input type="hidden" name="productos" value='{{ productos|tojson|safe }}'>
         {% endif %}
 
         <button type="submit" form="export-form">Guardar en BD</button>
@@ -130,14 +132,36 @@
     {% endif %}
 
     <!-- Agregar scripts para DataTable -->
-    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
     <script>
         $(document).ready(function() {
             $('#data-table').DataTable();
             $('#productos-table').DataTable();
             $('#informacion-facturacion-table').DataTable();
+        
+            // Agregar manejo del formulario
+            $('#export-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                fetch('{{ url_for("xml_upload.export_data") }}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert('Datos guardados correctamente');
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al procesar la solicitud');
+                });
+            });
         });
-    </script>
+        </script>
 </body>
 </html>

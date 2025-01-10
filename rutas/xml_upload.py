@@ -49,33 +49,61 @@ def upload_xml():
 
 @xml_upload_bp.route('/export_data', methods=['POST'])
 def export_data():
-    # Obtener los datos del formulario
-    datos = request.form.get('datos')
-    facturacion = request.form.get('facturacion')
-    productos = request.form.get('productos')
-    
-    # Verificar si los datos están presentes
-    if not datos or not facturacion or not productos:
-        return jsonify({'status': 'error', 'message': 'Datos, facturación o productos no proporcionados'}), 400
-
-    # Convertir los datos JSON a diccionarios de Python
     try:
-        datos = json.loads(datos)
-        facturacion = json.loads(facturacion)
-        productos = json.loads(productos)
-    except json.JSONDecodeError as e:
-        return jsonify({'status': 'error', 'message': f'Error al decodificar JSON: {str(e)}'}), 400
-    
-    # Enviar los datos como respuesta en formato JSON sin guardar en la base de datos
-    response_data = {
-        'status': 'success',
-        'message': 'Datos exportados correctamente',
-        'datos': datos,
-        'facturacion': facturacion,
-        'productos': productos
-    }
+        # Obtener los datos del formulario
+        datos = request.form.get('datos')
+        facturacion = request.form.get('facturacion')
+        productos = request.form.get('productos')
+        
+        # Debug: imprimir los datos recibidos
+        print("Datos recibidos:", datos)
+        print("Facturación recibida:", facturacion)
+        print("Productos recibidos:", productos)
+        
+        # Verificar si los datos están presentes
+        if not datos or not facturacion or not productos:
+            return jsonify({
+                'status': 'error',
+                'message': 'Datos incompletos',
+                'received': {
+                    'datos': bool(datos),
+                    'facturacion': bool(facturacion),
+                    'productos': bool(productos)
+                }
+            }), 400
 
-    return jsonify(response_data)
+        # Convertir los datos JSON a diccionarios de Python
+        try:
+            datos = json.loads(datos)
+            facturacion = json.loads(facturacion)
+            productos = json.loads(productos)
+        except json.JSONDecodeError as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error al decodificar JSON: {str(e)}',
+                'datos_recibidos': {
+                    'datos': datos[:100] if datos else None,  # Mostrar primeros 100 caracteres
+                    'facturacion': facturacion[:100] if facturacion else None,
+                    'productos': productos[:100] if productos else None
+                }
+            }), 400
+
+        # Guardar en la base de datos
+        save_to_db(datos, facturacion)
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Datos guardados correctamente',
+            'datos': datos,
+            'facturacion': facturacion,
+            'productos': productos
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error general: {str(e)}'
+        }), 500
 
 def parse_xml(file_content):
     tree = ET.parse(file_content)
