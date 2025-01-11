@@ -18,7 +18,7 @@
         <button type="submit">Cargar XML</button>
     </form>
 
-    {% if datos or facturacion %}
+    {% if datos or facturacion or productos or impuestos or notas %}
     <form id="export-form" action="{{ url_for('xml_upload.export_data') }}" method="POST">
         {% if datos %}
         <h2>Datos Extraídos</h2>
@@ -36,7 +36,6 @@
                     <th>Nombre del País</th>
                     <th>Teléfono</th>
                     <th>Email</th>
-                    <th>Actividad Económica</th>
                 </tr>
             </thead>
             <tbody>
@@ -53,7 +52,6 @@
                     <td>{{ dato.country_name }}</td>
                     <td>{{ dato.telephone }}</td>
                     <td>{{ dato.electronic_mail }}</td>
-                    <td>{{ dato.actividad_economica }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -99,6 +97,7 @@
             </tbody>
         </table>
         <br>
+        <input type="hidden" name="productos" value="{{ productos|tojson | escape }}">
         {% endif %}
 
         {% if facturacion %}
@@ -106,23 +105,93 @@
         <table id="informacion-facturacion-table" class="display">
             <thead>
                 <tr>
-                    <th>Campo</th>
-                    <th>Valor</th>
+                    <th>UBL Version ID</th>
+                    <th>Customization ID</th>
+                    <th>Profile ID</th>
+                    <th>Profile Execution ID</th>
+                    <th>Document ID</th>
+                    <th>UUID</th>
+                    <th>Issue Date</th>
+                    <th>Issue Time</th>
+                    <th>Due Date</th>
+                    <th>Invoice Type Code</th>
+                    <th>Document Currency Code</th>
+                    <th>Line Count Numeric</th>
+                    <th>Supplier ID</th>
+                    <th>Customer ID</th>
                 </tr>
             </thead>
             <tbody>
                 {% for factura in facturacion %}
-                {% if factura.campo != 'Producto' and factura.campo != 'Código Producto' and factura.campo != 'Descripcion Producto' %}
                 <tr>
-                    <td>{{ factura.campo }}</td>
-                    <td>{{ factura.valor }}</td>
+                    <td>{{ factura.ubl_version_id }}</td>
+                    <td>{{ factura.customization_id }}</td>
+                    <td>{{ factura.profile_id }}</td>
+                    <td>{{ factura.profile_execution_id }}</td>
+                    <td>{{ factura.document_id }}</td>
+                    <td>{{ factura.uuid }}</td>
+                    <td>{{ factura.issue_date }}</td>
+                    <td>{{ factura.issue_time }}</td>
+                    <td>{{ factura.due_date }}</td>
+                    <td>{{ factura.invoice_type_code }}</td>
+                    <td>{{ factura.document_currency_code }}</td>
+                    <td>{{ factura.line_count_numeric }}</td>
+                    <td>{{ factura.supplier_id }}</td>
+                    <td>{{ factura.customer_id }}</td>
                 </tr>
-                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
         <br>
         <input type="hidden" name="facturacion" value="{{ facturacion|tojson | escape }}">
+        {% endif %}
+
+        {% if impuestos %}
+        <h2>Información de Impuestos</h2>
+        <table id="impuestos-table" class="display">
+            <thead>
+                <tr>
+                    <th>Taxable Amount</th>
+                    <th>Tax Amount</th>
+                    <th>Tax Percent</th>
+                    <th>Tax Scheme ID</th>
+                    <th>Tax Scheme Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for impuesto in impuestos %}
+                <tr>
+                    <td>{{ impuesto.taxable_amount }}</td>
+                    <td>{{ impuesto.tax_amount }}</td>
+                    <td>{{ impuesto.tax_percent }}</td>
+                    <td>{{ impuesto.tax_scheme_id }}</td>
+                    <td>{{ impuesto.tax_scheme_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <input type="hidden" name="impuestos" value="{{ impuestos|tojson | escape }}">
+        {% endif %}
+
+        {% if notas %}
+        <h2>Notas</h2>
+        <table id="notas-table" class="display">
+            <thead>
+                <tr>
+                    <th>Nota</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nota in notas %}
+                <tr>
+                    <td>{{ nota.nota }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <input type="hidden" name="notas" value="{{ notas|tojson | escape }}">
         {% endif %}
 
         <button type="submit" form="export-form">Guardar en BD</button>
@@ -137,6 +206,8 @@
             $('#data-table').DataTable();
             $('#productos-table').DataTable();
             $('#informacion-facturacion-table').DataTable();
+            $('#impuestos-table').DataTable();
+            $('#notas-table').DataTable();
         });
     </script>
 </body>

@@ -2,9 +2,8 @@ import xml.etree.ElementTree as ET
 from flask import Blueprint, request, jsonify, render_template
 from io import BytesIO
 from app import db
-from app.models.models import Empresa, InformacionTerceros, Facturacion
+from app.models.models import Empresa, InformacionTerceros, Facturacion, InvoiceLine
 import json
-from markupsafe import Markup
 
 # Crear el Blueprint
 xml_upload_bp = Blueprint('xml_upload', __name__)
@@ -28,7 +27,7 @@ def upload_xml():
 
             # Procesar el archivo XML directamente desde la memoria
             try:
-                datos, facturacion, productos = parse_xml(file_content)
+                datos, facturacion, productos, impuestos, notas = parse_xml(file_content)
                 
                 # Imprimir los datos por consola
                 print_data(datos)
@@ -38,9 +37,15 @@ def upload_xml():
                 print("Productos Extraídos:")
                 for producto in productos:
                     print(producto)
+                print("Impuestos Extraídos:")
+                for impuesto in impuestos:
+                    print(impuesto)
+                print("Notas Extraídas:")
+                for nota in notas:
+                    print(nota)
                 
                 # Renderizar la plantilla con los datos extraídos
-                return render_template('upload_xml.html', datos=datos, facturacion=facturacion, productos=productos)
+                return render_template('upload_xml.html', datos=datos, facturacion=facturacion, productos=productos, impuestos=impuestos, notas=notas)
                 
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -53,29 +58,82 @@ def export_data():
     datos = request.form.get('datos')
     facturacion = request.form.get('facturacion')
     productos = request.form.get('productos')
+    impuestos = request.form.get('impuestos')
+    notas = request.form.get('notas')
     
     # Verificar si los datos están presentes
-    if not datos or not facturacion or not productos:
-        return jsonify({'status': 'error', 'message': 'Datos, facturación o productos no proporcionados'}), 400
+    if not datos or not facturacion or not productos or not impuestos or not notas:
+        return jsonify({'status': 'error', 'message': 'Datos, facturación, productos, impuestos o notas no proporcionados'}), 400
 
     # Convertir los datos JSON a diccionarios de Python
     try:
         datos = json.loads(datos)
         facturacion = json.loads(facturacion)
         productos = json.loads(productos)
+        impuestos = json.loads(impuestos)
+        notas = json.loads(notas)
     except json.JSONDecodeError as e:
         return jsonify({'status': 'error', 'message': f'Error al decodificar JSON: {str(e)}'}), 400
     
-    # Enviar los datos como respuesta en formato JSON sin guardar en la base de datos
-    response_data = {
-        'status': 'success',
-        'message': 'Datos exportados correctamente',
-        'datos': datos,
-        'facturacion': facturacion,
-        'productos': productos
-    }
+    # Guardar los datos en la base de datos
+    try:
+        for dato in datos:
+            empresa = InformacionTerceros(
+                registration_name=dato['registration_name'],
+                company_id=dato['company_id'],
+                tax_level_code=dato['tax_level_code'],
+                address=dato['address'],
+                city_name=dato['city_name'],
+                country_subentity=dato['country_subentity'],
+                country_subentity_code=dato['country_subentity_code'],
+                country=dato['country'],
+                country_name=dato['country_name'],
+                telephone=dato['telephone'],
+                electronic_mail=dato['electronic_mail']
+            )
+            db.session.add(empresa)
 
-    return jsonify(response_data)
+        for factura in facturacion:
+            fact = Facturacion(
+                ubl_version_id=factura['ubl_version_id'],
+                customization_id=factura['customization_id'],
+                profile_id=factura['profile_id'],
+                profile_execution_id=factura['profile_execution_id'],
+                document_id=factura['document_id'],
+                uuid=factura['uuid'],
+                issue_date=factura['issue_date'],
+                issue_time=factura['issue_time'],
+                due_date=factura['due_date'],
+                invoice_type_code=factura['invoice_type_code'],
+                document_currency_code=factura['document_currency_code'],
+                line_count_numeric=factura['line_count_numeric'],
+                supplier_id=factura['supplier_id'],
+                customer_id=factura['customer_id']
+            )
+            db.session.add(fact)
+
+        for producto in productos:
+            line = InvoiceLine(
+                line_id=producto['nro'],
+                codigo=producto['codigo'],
+                descripcion=producto['descripcion'],
+                um=producto['um'],
+                cantidad=producto['cantidad'],
+                precio_unitario=producto['precio_unitario'],
+                precio_venta=producto['precio_venta'],
+                descuento_detalle=producto['descuento_detalle'],
+                recargo_detalle=producto['recargo_detalle'],
+                iva=producto['iva'],
+                inc=producto['inc']
+            )
+            db.session.add(line)
+
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': f'Error al guardar en la base de datos: {str(e)}'}), 500
 
 def parse_xml(file_content):
     tree = ET.parse(file_content)
@@ -91,6 +149,8 @@ def parse_xml(file_content):
     datos = []
     facturacion = []
     productos = []
+    impuestos = []
+    notas = []
 
     # Buscar el nodo <cbc:Description> que contiene el CDATA con el XML interno
     description_node = root.find('.//cbc:Description', namespaces=namespaces)
@@ -114,53 +174,23 @@ def parse_xml(file_content):
             datos.append(customer_info)
 
             # Extraer la información de facturación
-            tax_total = inner_root.find('cac:TaxTotal', namespaces=namespaces)
-            if tax_total is not None:
-                tax_amount = tax_total.findtext('cbc:TaxAmount', namespaces=namespaces)
-                facturacion.append({'campo': 'Monto de Impuestos', 'valor': tax_amount})
-
-            legal_monetary_total = inner_root.find('cac:LegalMonetaryTotal', namespaces=namespaces)
-            if legal_monetary_total is not None:
-                line_extension_amount = legal_monetary_total.findtext('cbc:LineExtensionAmount', namespaces=namespaces)
-                tax_exclusive_amount = legal_monetary_total.findtext('cbc:TaxExclusiveAmount', namespaces=namespaces)
-                tax_inclusive_amount = legal_monetary_total.findtext('cbc:TaxInclusiveAmount', namespaces=namespaces)
-                prepaid_amount = legal_monetary_total.findtext('cbc:PrepaidAmount', namespaces=namespaces)
-                payable_amount = legal_monetary_total.findtext('cbc:PayableAmount', namespaces=namespaces)
-
-                facturacion.append({'campo': 'Monto Total de Líneas', 'valor': line_extension_amount})
-                facturacion.append({'campo': 'Monto Total Sin Impuestos', 'valor': tax_exclusive_amount})
-                facturacion.append({'campo': 'Monto Total Con Impuestos', 'valor': tax_inclusive_amount})
-                facturacion.append({'campo': 'Monto Pre-Pagado', 'valor': prepaid_amount})
-                facturacion.append({'campo': 'Monto a Pagar', 'valor': payable_amount})
-
-            # Extraer la información del nodo <cbc:Note>
-            note_node = inner_root.find('.//cbc:Note', namespaces=namespaces)
-            if note_node is not None and note_node.text:
-                # Extraer el contenido de <cbc:Note> y colocarlo como 'valor'
-                facturacion.append({'campo': 'Curso de Excel Intermedio', 'valor': note_node.text.strip()})
-                print("Note Content found:", note_node.text.strip())
-                
-            price_amount = inner_root.find('.//cbc:PriceAmount', namespaces=namespaces)
-            if price_amount is not None:
-                facturacion.append({'campo': 'Costo individual', 'valor': price_amount.text.strip()})
-                print("Price Amount found:", price_amount.text.strip())
-                
-            descripcion_producto = inner_root.find('.//cbc:Description', namespaces=namespaces)
-            if descripcion_producto is not None:
-                facturacion.append({'campo': 'Descripcion Producto', 'valor': descripcion_producto.text.strip()})
-                print("Producto Encontrado:", descripcion_producto.text.strip())
-                
-            # Extraer el código del producto
-            codigo_producto = inner_root.find('.//cac:StandardItemIdentification/cbc:ID', namespaces=namespaces)
-            if codigo_producto is not None:
-                facturacion.append({'campo': 'Código Producto', 'valor': codigo_producto.text.strip()})
-                print("Código Producto Encontrado:", codigo_producto.text.strip())
-
-            # Extraer el valor de la retención en la fuente
-            withholding_tax_total = inner_root.find('.//cac:WithholdingTaxTotal/cbc:TaxAmount', namespaces=namespaces)
-            if withholding_tax_total is not None:
-                facturacion.append({'campo': 'Retención en la Fuente', 'valor': withholding_tax_total.text.strip()})
-                print("Retención en la Fuente Encontrada:", withholding_tax_total.text.strip())
+            facturacion_data = {
+                'ubl_version_id': inner_root.findtext('cbc:UBLVersionID', namespaces=namespaces),
+                'customization_id': inner_root.findtext('cbc:CustomizationID', namespaces=namespaces),
+                'profile_id': inner_root.findtext('cbc:ProfileID', namespaces=namespaces),
+                'profile_execution_id': inner_root.findtext('cbc:ProfileExecutionID', namespaces=namespaces),
+                'document_id': inner_root.findtext('cbc:ID', namespaces=namespaces),
+                'uuid': inner_root.findtext('cbc:UUID', namespaces=namespaces),
+                'issue_date': inner_root.findtext('cbc:IssueDate', namespaces=namespaces),
+                'issue_time': inner_root.findtext('cbc:IssueTime', namespaces=namespaces),
+                'due_date': inner_root.findtext('cbc:DueDate', namespaces=namespaces),
+                'invoice_type_code': inner_root.findtext('cbc:InvoiceTypeCode', namespaces=namespaces),
+                'document_currency_code': inner_root.findtext('cbc:DocumentCurrencyCode', namespaces=namespaces),
+                'line_count_numeric': inner_root.findtext('cbc:LineCountNumeric', namespaces=namespaces),
+                'supplier_id': supplier_info['company_id'],
+                'customer_id': customer_info['company_id']
+            }
+            facturacion.append(facturacion_data)
 
             # Extraer la información de los productos
             invoice_lines = inner_root.findall('.//cac:InvoiceLine', namespaces=namespaces)
@@ -191,6 +221,32 @@ def parse_xml(file_content):
                     'inc': inc
                 })
 
+            # Extraer la información de impuestos
+            tax_totals = inner_root.findall('.//cac:TaxTotal', namespaces=namespaces)
+            for tax_total in tax_totals:
+                tax_amount = tax_total.findtext('cbc:TaxAmount', namespaces=namespaces)
+                tax_subtotals = tax_total.findall('.//cac:TaxSubtotal', namespaces=namespaces)
+                for tax_subtotal in tax_subtotals:
+                    taxable_amount = tax_subtotal.findtext('cbc:TaxableAmount', namespaces=namespaces)
+                    tax_amount_subtotal = tax_subtotal.findtext('cbc:TaxAmount', namespaces=namespaces)
+                    tax_percent = tax_subtotal.findtext('.//cbc:Percent', namespaces=namespaces)
+                    tax_scheme_id = tax_subtotal.findtext('.//cac:TaxScheme/cbc:ID', namespaces=namespaces)
+                    tax_scheme_name = tax_subtotal.findtext('.//cac:TaxScheme/cbc:Name', namespaces=namespaces)
+
+                    impuestos.append({
+                        'taxable_amount': taxable_amount,
+                        'tax_amount': tax_amount_subtotal,
+                        'tax_percent': tax_percent,
+                        'tax_scheme_id': tax_scheme_id,
+                        'tax_scheme_name': tax_scheme_name
+                    })
+
+            # Extraer la información de las notas
+            note_nodes = inner_root.findall('.//cbc:Note', namespaces=namespaces)
+            for note_node in note_nodes:
+                if note_node is not None and note_node.text:
+                    notas.append({'nota': note_node.text.strip()})
+
         except ET.ParseError as e:
             print("Error parsing inner XML:", e)
         except Exception as e:
@@ -198,7 +254,7 @@ def parse_xml(file_content):
     else:
         print("Description node not found or empty")
 
-    return datos, facturacion, productos
+    return datos, facturacion, productos, impuestos, notas
 
 def extract_party_info(party, namespaces):
     if party is None:
@@ -270,8 +326,20 @@ def save_to_db(datos, facturacion):
 
         for factura in facturacion:
             fact = Facturacion(
-                campo=factura['campo'],
-                valor=factura['valor']
+                ubl_version_id=factura['ubl_version_id'],
+                customization_id=factura['customization_id'],
+                profile_id=factura['profile_id'],
+                profile_execution_id=factura['profile_execution_id'],
+                document_id=factura['document_id'],
+                uuid=factura['uuid'],
+                issue_date=factura['issue_date'],
+                issue_time=factura['issue_time'],
+                due_date=factura['due_date'],
+                invoice_type_code=factura['invoice_type_code'],
+                document_currency_code=factura['document_currency_code'],
+                line_count_numeric=factura['line_count_numeric'],
+                supplier_id=factura['supplier_id'],
+                customer_id=factura['customer_id']
             )
             db.session.add(fact)
 
