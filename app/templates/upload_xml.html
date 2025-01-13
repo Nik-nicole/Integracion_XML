@@ -6,128 +6,203 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cargar archivo XML</title>
-    <!-- Agregar CSS para DataTable -->
+    <!-- Agregar CSS para DataTable y estilos personalizados -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 {
+            color: #333;
+        }
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 10px;
+            display: block;
+        }
+        input[type="file"] {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .table-container {
+            margin-top: 40px;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
     <h2>Cargar archivo XML</h2>
-    <form action="{{ url_for('xml_upload.upload_xml') }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ url_for('xml_upload.upload_xml') }}" method="POST" enctype="multipart/form-data" class="form-container">
         <label for="xml_file">Selecciona un archivo XML:</label>
         <input type="file" name="xml_file" id="xml_file" accept=".xml" required>
-        <br><br>
         <button type="submit">Cargar XML</button>
     </form>
 
     {% if datos or facturacion %}
     <form id="export-form" action="{{ url_for('xml_upload.export_data') }}" method="POST">
         {% if datos %}
-        <h2>Datos Extraídos</h2>
-        <table id="data-table" class="display">
-            <thead>
-                <tr>
-                    <th>Identificación</th>
-                    <th>Nombre/Razón Social</th>
-                    <th>Tipo Persona</th>
-                    <th>Dirección</th>
-                    <th>Ciudad</th>
-                    <th>Subentidad del País</th>
-                    <th>Código de Subentidad del País</th>
-                    <th>País</th>
-                    <th>Nombre del País</th>
-                    <th>Teléfono</th>
-                    <th>Email</th>
-                    <th>Actividad Económica</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for dato in datos %}
-                <tr>
-                    <td>{{ dato.company_id }}</td>
-                    <td>{{ dato.registration_name }}</td>
-                    <td>{{ dato.tax_level_code }}</td>
-                    <td>{{ dato.address }}</td>
-                    <td>{{ dato.city_name }}</td>
-                    <td>{{ dato.country_subentity }}</td>
-                    <td>{{ dato.country_subentity_code }}</td>
-                    <td>{{ dato.country }}</td>
-                    <td>{{ dato.country_name }}</td>
-                    <td>{{ dato.telephone }}</td>
-                    <td>{{ dato.electronic_mail }}</td>
-                    <td>{{ dato.actividad_economica }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
-        <input type="hidden" name="datos" value="{{ datos|tojson | escape }}">
+        <div class="table-container">
+            <h2>Datos Extraídos</h2>
+            <table id="data-table" class="display">
+                <thead>
+                    <tr>
+                        <th>Identificación</th>
+                        <th>Nombre/Razón Social</th>
+                        <th>Tipo Persona</th>
+                        <th>Dirección</th>
+                        <th>Ciudad</th>
+                        <th>Subentidad del País</th>
+                        <th>Código de Subentidad del País</th>
+                        <th>País</th>
+                        <th>Nombre del País</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th>Actividad Económica</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dato in datos %}
+                    <tr>
+                        <td>{{ dato.company_id }}</td>
+                        <td>{{ dato.registration_name }}</td>
+                        <td>{{ dato.tax_level_code }}</td>
+                        <td>{{ dato.address }}</td>
+                        <td>{{ dato.city_name }}</td>
+                        <td>{{ dato.country_subentity }}</td>
+                        <td>{{ dato.country_subentity_code }}</td>
+                        <td>{{ dato.country }}</td>
+                        <td>{{ dato.country_name }}</td>
+                        <td>{{ dato.telephone }}</td>
+                        <td>{{ dato.electronic_mail }}</td>
+                        <td>{{ dato.actividad_economica }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <input type="hidden" name="datos" value="{{ datos|tojson | escape }}">
+        </div>
         {% endif %}
 
         {% if productos %}
-        <h2>Detalles de Productos</h2>
-        <table id="productos-table" class="display">
-            <thead>
-                <tr>
-                    <th>Nro.</th>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>U/M</th>
-                    <th>Cantidad</th>
-                    <th>Precio unitario</th>
-                    <th>Precio de venta</th>
-                    <th>Descuento detalle</th>
-                    <th>Recargo detalle</th>
-                    <th>IVA %</th>
-                    <th>INC %</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for producto in productos %}
-                <tr>
-                    <td>{{ producto.nro }}</td>
-                    <td>{{ producto.codigo }}</td>
-                    <td>{{ producto.descripcion }}</td>
-                    <td>{{ producto.um }}</td>
-                    <td>{{ producto.cantidad }}</td>
-                    <td>{{ producto.precio_unitario }}</td>
-                    <td>{{ producto.precio_venta }}</td>
-                    <td>{{ producto.descuento_detalle }}</td>
-                    <td>{{ producto.recargo_detalle }}</td>
-                    <td>{{ producto.iva }}</td>
-                    <td>{{ producto.inc }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
+        <div class="table-container">
+            <h2>Detalles de Productos</h2>
+            <table id="productos-table" class="display">
+                <thead>
+                    <tr>
+                        <th>Nro.</th>
+                        <th>Código</th>
+                        <th>Descripción</th>
+                        <th>U/M</th>
+                        <th>Cantidad</th>
+                        <th>Precio unitario</th>
+                        <th>Precio de venta</th>
+                        <th>Descuento detalle</th>
+                        <th>Recargo detalle</th>
+                        <th>IVA %</th>
+                        <th>INC %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr>
+                        <td>{{ producto.nro }}</td>
+                        <td>{{ producto.codigo }}</td>
+                        <td>{{ producto.descripcion }}</td>
+                        <td>{{ producto.um }}</td>
+                        <td>{{ producto.cantidad }}</td>
+                        <td>{{ producto.precio_unitario }}</td>
+                        <td>{{ producto.precio_venta }}</td>
+                        <td>{{ producto.descuento_detalle }}</td>
+                        <td>{{ producto.recargo_detalle }}</td>
+                        <td>{{ producto.iva }}</td>
+                        <td>{{ producto.inc }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% endif %}
 
         {% if facturacion %}
-        <h2>Información de Facturación</h2>
-        <table id="informacion-facturacion-table" class="display">
-            <thead>
-                <tr>
-                    <th>Campo</th>
-                    <th>Valor</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for factura in facturacion %}
-                {% if factura.campo != 'Producto' and factura.campo != 'Código Producto' and factura.campo != 'Descripcion Producto' %}
-                <tr>
-                    <td>{{ factura.campo }}</td>
-                    <td>{{ factura.valor }}</td>
-                </tr>
-                {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
-        <input type="hidden" name="datos" value='{{ datos|tojson|safe }}'>
-        <input type="hidden" name="facturacion" value='{{ facturacion|tojson|safe }}'>
-        <input type="hidden" name="productos" value='{{ productos|tojson|safe }}'>
+        <div class="table-container">
+            <h2>Información de Facturación</h2>
+            <table id="informacion-facturacion-table" class="display">
+                <thead>
+                    <tr>
+                        <th>Campo</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for factura in facturacion %}
+                    {% if factura.campo != 'Producto' and factura.campo != 'Código Producto' and factura.campo != 'Descripcion Producto' %}
+                    <tr>
+                        <td>{{ factura.campo }}</td>
+                        <td>{{ factura.valor }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            <input type="hidden" name="datos" value='{{ datos|tojson|safe }}'>
+            <input type="hidden" name="facturacion" value='{{ facturacion|tojson|safe }}'>
+            <input type="hidden" name="productos" value='{{ productos|tojson|safe }}'>
+        </div>
         {% endif %}
 
-        <button type="submit" form="export-form">Guardar en BD</button>
+        <button type="submit" form="export-form" class="mt-4">Guardar en BD</button>
     </form>
     {% endif %}
 
@@ -137,31 +212,7 @@
             $('#data-table').DataTable();
             $('#productos-table').DataTable();
             $('#informacion-facturacion-table').DataTable();
-        
-            // Agregar manejo del formulario
-            $('#export-form').on('submit', function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData(this);
-                
-                fetch('{{ url_for("xml_upload.export_data") }}', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        alert('Datos guardados correctamente');
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error al procesar la solicitud');
-                });
-            });
         });
-        </script>
+    </script>
 </body>
 </html>

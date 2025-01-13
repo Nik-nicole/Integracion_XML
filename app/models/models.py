@@ -8,20 +8,18 @@ import uuid
 
 class InformacionTerceros(db.Model):
     __tablename__ = 'informacion_terceros'
-    
     id = db.Column(db.Integer, primary_key=True)
     registration_name = db.Column(db.String(255), nullable=False)
-    company_id = db.Column(db.String(255), nullable=False)
-    tax_level_code = db.Column(db.String(255), nullable=True)
-    address = db.Column(db.String(255), nullable=True)
-    city_name = db.Column(db.String(255), nullable=True)
-    country_subentity = db.Column(db.String(255), nullable=True)
-    country_subentity_code = db.Column(db.String(255), nullable=True)
-    country = db.Column(db.String(255), nullable=True)
-    country_name = db.Column(db.String(255), nullable=True)
-    telephone = db.Column(db.String(255), nullable=True)
-    electronic_mail = db.Column(db.String(255), nullable=True)
-    actividad_economica = db.Column(db.String(255), nullable=True)
+    company_id = db.Column(db.String(50), unique=True, nullable=False)
+    tax_level_code = db.Column(db.String(50))
+    address = db.Column(db.String(255))
+    city_name = db.Column(db.String(255))
+    country_subentity = db.Column(db.String(255))
+    country_subentity_code = db.Column(db.String(50))
+    country = db.Column(db.String(50))
+    country_name = db.Column(db.String(255))
+    telephone = db.Column(db.String(50))
+    electronic_mail = db.Column(db.String(255))
 
 class Empresa(db.Model):
     __tablename__ = 'empresa'
@@ -40,11 +38,23 @@ class Empresa(db.Model):
     
 class Facturacion(db.Model):
     __tablename__ = 'facturacion'
-    
     id = db.Column(db.Integer, primary_key=True)
-    campo = db.Column(db.String(255), nullable=False)
-    valor = db.Column(db.String(255), nullable=False)
-
+    ubl_version_id = db.Column(db.String(50))
+    customization_id = db.Column(db.String(50))
+    profile_id = db.Column(db.String(255))
+    profile_execution_id = db.Column(db.String(50))
+    document_id = db.Column(db.String(255))
+    uuid = db.Column(db.String(255))
+    issue_date = db.Column(db.Date)
+    issue_time = db.Column(db.Time)
+    due_date = db.Column(db.Date)
+    invoice_type_code = db.Column(db.String(50))
+    document_currency_code = db.Column(db.String(50))
+    line_count_numeric = db.Column(db.Integer)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('empresa.id'))
+    customer_id = db.Column(db.Integer, db.ForeignKey('informacion_terceros.id'))
+    supplier = db.relationship('Empresa', backref=db.backref('facturaciones', lazy=True))
+    customer = db.relationship('InformacionTerceros', backref=db.backref('facturaciones', lazy=True))
     
 class InvoiceLine(db.Model):
     __tablename__ = 'invoice_line'
