@@ -11,15 +11,19 @@
 </head>
 <body>
     <h2>Cargar archivo XML</h2>
-    <form action="{{ url_for('xml_upload.upload_xml') }}" method="POST" enctype="multipart/form-data">
+    <form id="upload-form" action="{{ url_for('xml_upload.upload_xml') }}" method="POST" enctype="multipart/form-data">
         <label for="xml_file">Selecciona un archivo XML:</label>
         <input type="file" name="xml_file" id="xml_file" accept=".xml" required>
         <br><br>
         <button type="submit">Cargar XML</button>
     </form>
 
+    <div id="resultados">
+        <!-- Aquí se mostrarán los resultados -->
+    </div>
+
     {% if datos or facturacion or productos or impuestos or notas %}
-    <form id="export-form" action="{{ url_for('xml_upload.export_data') }}" method="POST">
+    <form id="export-form">
         {% if datos %}
         <h2>Datos Extraídos</h2>
         <table id="data-table" class="display">
@@ -208,6 +212,79 @@
             $('#informacion-facturacion-table').DataTable();
             $('#impuestos-table').DataTable();
             $('#notas-table').DataTable();
+
+            $('#upload-form').on('submit', function(event) {
+                event.preventDefault();
+                var formData = new FormData(this);
+                $.ajax({
+                    url: "{{ url_for('xml_upload.upload_xml') }}",
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        console.log(response);
+                        $('#resultados').html(response);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error(xhr.responseText);
+                    }
+                });
+            });
+
+            $('#export-form').on('submit', function(event) {
+                event.preventDefault();
+                try {
+                    var datos = $('input[name="datos"]').val();
+                    var facturacion = $('input[name="facturacion"]').val();
+                    var productos = $('input[name="productos"]').val();
+                    var impuestos = $('input[name="impuestos"]').val();
+                    var notas = $('input[name="notas"]').val();
+
+                    // Log the raw data to the console
+                    console.log("Raw datos:", datos);
+                    console.log("Raw facturacion:", facturacion);
+                    console.log("Raw productos:", productos);
+                    console.log("Raw impuestos:", impuestos);
+                    console.log("Raw notas:", notas);
+
+                    // Ensure the raw data is valid JSON
+                    datos = JSON.parse(datos);
+                    facturacion = JSON.parse(facturacion);
+                    productos = JSON.parse(productos);
+                    impuestos = JSON.parse(impuestos);
+                    notas = JSON.parse(notas);
+
+                    var formData = JSON.stringify({
+                        datos: datos,
+                        facturacion: facturacion,
+                        productos: productos,
+                        impuestos: impuestos,
+                        notas: notas
+                    });
+
+                    // Log the JSON data to the console
+                    console.log("JSON data to be sent:", formData);
+
+                    $.ajax({
+                        url: "{{ url_for('xml_upload.export_data') }}",
+                        type: 'POST',
+                        data: formData,
+                        contentType: 'application/json',
+                        success: function(response) {
+                            console.log(response);
+                            alert('Datos guardados correctamente');
+                        },
+                        error: function(xhr, status, error) {
+                            console.error(xhr.responseText);
+                            alert('Error al guardar los datos');
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error al parsear JSON:', e);
+                    alert('Error al procesar los datos. Por favor, inténtelo de nuevo.');
+                }
+            });
         });
     </script>
 </body>

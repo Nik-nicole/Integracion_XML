@@ -12,47 +12,45 @@ xml_upload_bp = Blueprint('xml_upload', __name__)
 @xml_upload_bp.route('/upload', methods=['GET', 'POST'])
 def upload_xml():
     if request.method == 'POST':
-        # Verificar si el archivo está en la solicitud
         if 'xml_file' not in request.files:
             return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
         file = request.files['xml_file']
 
-        # Verificar si el archivo tiene un nombre válido
         if file.filename == '':
             return jsonify({'error': 'No se seleccionó un archivo'}), 400
 
-        if file:
-            # Leer el archivo en memoria usando BytesIO
+        try:
             file_content = BytesIO(file.read())
+            datos, facturacion, productos, impuestos, notas = parse_xml(file_content)
+            
+            # Convertir valores None a cadenas vacías y asegurar que las listas no sean None
+            datos = [{k: str(v) if v is not None else '' for k, v in d.items()} for d in (datos or [])]
+            facturacion = [{k: str(v) if v is not None else '' for k, v in f.items()} for f in (facturacion or [])]
+            productos = [{k: str(v) if v is not None else '' for k, v in p.items()} for p in (productos or [])]
+            impuestos = [{k: str(v) if v is not None else '' for k, v in i.items()} for i in (impuestos or [])]
+            notas = [{k: str(v) if v is not None else '' for k, v in n.items()} for n in (notas or [])]
 
-            # Procesar el archivo XML directamente desde la memoria
-            try:
-                datos, facturacion, productos, impuestos, notas = parse_xml(file_content)
-                
-                # Imprimir los datos por consola
-                print_data(datos)
-                print("Facturación Extraída:")
-                for factura in facturacion:
-                    print(factura)
-                print("Productos Extraídos:")
-                for producto in productos:
-                    print(producto)
-                print("Impuestos Extraídos:")
-                for impuesto in impuestos:
-                    print(impuesto)
-                print("Notas Extraídas:")
-                for nota in notas:
-                    print(nota)
-                
-                # Renderizar la plantilla con los datos extraídos
-                return render_template('upload_xml.html', datos=datos, facturacion=facturacion, productos=productos, impuestos=impuestos, notas=notas)
-                
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+            print_data(datos, facturacion, productos, impuestos, notas)
 
-    return render_template('upload_xml.html')
+            return render_template('upload_xml.html',
+                                   datos=datos,
+                                   facturacion=facturacion,
+                                   productos=productos,
+                                   impuestos=impuestos,
+                                   notas=notas)
 
-@xml_upload_bp.route('/export_data', methods=['POST'])
+        except Exception as e:
+            print(f"Error durante el procesamiento: {str(e)}")
+            return jsonify({'error': f'Error durante el procesamiento: {str(e)}'}), 500
+
+    return render_template('upload_xml.html', 
+                           datos=[], 
+                           facturacion=[],
+                           productos=[],
+                           impuestos=[],
+                           notas=[])
+
+""" @xml_upload_bp.route('/export_data', methods=['POST'])
 def export_data():
     # Obtener los datos del formulario
     datos = request.form.get('datos')
@@ -77,58 +75,30 @@ def export_data():
     
     # Guardar los datos en la base de datos
     try:
-        for dato in datos:
-            empresa = InformacionTerceros(
-                registration_name=dato['registration_name'],
-                company_id=dato['company_id'],
-                tax_level_code=dato['tax_level_code'],
-                address=dato['address'],
-                city_name=dato['city_name'],
-                country_subentity=dato['country_subentity'],
-                country_subentity_code=dato['country_subentity_code'],
-                country=dato['country'],
-                country_name=dato['country_name'],
-                telephone=dato['telephone'],
-                electronic_mail=dato['electronic_mail']
-            )
-            db.session.add(empresa)
+        save_to_db(datos, facturacion, productos, impuestos, notas)
+        return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
 
-        for factura in facturacion:
-            fact = Facturacion(
-                ubl_version_id=factura['ubl_version_id'],
-                customization_id=factura['customization_id'],
-                profile_id=factura['profile_id'],
-                profile_execution_id=factura['profile_execution_id'],
-                document_id=factura['document_id'],
-                uuid=factura['uuid'],
-                issue_date=factura['issue_date'],
-                issue_time=factura['issue_time'],
-                due_date=factura['due_date'],
-                invoice_type_code=factura['invoice_type_code'],
-                document_currency_code=factura['document_currency_code'],
-                line_count_numeric=factura['line_count_numeric'],
-                supplier_id=factura['supplier_id'],
-                customer_id=factura['customer_id']
-            )
-            db.session.add(fact)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': f'Error al guardar en la base de datos: {str(e)}'}), 500 """
+        
+@xml_upload_bp.route('/export_data', methods=['POST'])
+def export_data():
+    try:
+        # Obtener los datos JSON del cuerpo de la solicitud
+        data = request.get_json()
+        datos = data.get('datos', [])
+        facturacion = data.get('facturacion', [])
+        productos = data.get('productos', [])
+        impuestos = data.get('impuestos', [])
+        notas = data.get('notas', [])
 
-        for producto in productos:
-            line = InvoiceLine(
-                line_id=producto['nro'],
-                codigo=producto['codigo'],
-                descripcion=producto['descripcion'],
-                um=producto['um'],
-                cantidad=producto['cantidad'],
-                precio_unitario=producto['precio_unitario'],
-                precio_venta=producto['precio_venta'],
-                descuento_detalle=producto['descuento_detalle'],
-                recargo_detalle=producto['recargo_detalle'],
-                iva=producto['iva'],
-                inc=producto['inc']
-            )
-            db.session.add(line)
+        # Verificar si los datos están presentes
+        if not datos or not facturacion or not productos or not impuestos or not notas:
+            return jsonify({'status': 'error', 'message': 'Datos, facturación, productos, impuestos o notas no proporcionados'}), 400
 
-        db.session.commit()
+        # Guardar los datos en la base de datos
+        save_to_db(datos, facturacion, productos, impuestos, notas)
         return jsonify({'status': 'success', 'message': 'Datos exportados correctamente'})
 
     except Exception as e:
@@ -290,23 +260,14 @@ def extract_party_info(party, namespaces):
 
     return info
 
-def print_data(datos):
-    print("Datos Extraídos:")
-    for dato in datos:
-        print("Identificación:", dato.get('company_id', 'N/A'))
-        print("Nombre/Razón Social:", dato.get('registration_name', 'N/A'))
-        print("Tipo Persona:", dato.get('tax_level_code', 'N/A'))
-        print("Dirección:", dato.get('address', 'N/A'))
-        print("Ciudad:", dato.get('city_name', 'N/A'))
-        print("Subentidad del País:", dato.get('country_subentity', 'N/A'))
-        print("Código de Subentidad del País:", dato.get('country_subentity_code', 'N/A'))
-        print("País:", dato.get('country', 'N/A'))
-        print("Nombre del País:", dato.get('country_name', 'N/A'))
-        print("Teléfono:", dato.get('telephone', 'N/A'))
-        print("Email:", dato.get('electronic_mail', 'N/A'))
-        print("-------------------------------")
+def print_data(datos, facturacion, productos, impuestos, notas):
+    print("Datos:", datos)
+    print("Facturación:", facturacion)
+    print("Productos:", productos)
+    print("Impuestos:", impuestos)
+    print("Notas:", notas)
 
-def save_to_db(datos, facturacion):
+def save_to_db(datos, facturacion, productos, impuestos, notas):
     try:
         for dato in datos:
             empresa = InformacionTerceros(
@@ -342,6 +303,22 @@ def save_to_db(datos, facturacion):
                 customer_id=factura['customer_id']
             )
             db.session.add(fact)
+
+        for producto in productos:
+            line = InvoiceLine(
+                line_id=producto['nro'],
+                codigo=producto['codigo'],
+                descripcion=producto['descripcion'],
+                um=producto['um'],
+                cantidad=producto['cantidad'],
+                precio_unitario=producto['precio_unitario'],
+                precio_venta=producto['precio_venta'],
+                descuento_detalle=producto['descuento_detalle'],
+                recargo_detalle=producto['recargo_detalle'],
+                iva=producto['iva'],
+                inc=producto['inc']
+            )
+            db.session.add(line)
 
         db.session.commit()
 
