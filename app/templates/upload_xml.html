@@ -250,25 +250,43 @@
                 e.preventDefault();
                 
                 try {
-                    // Get raw data
+                    // Obtener datos
                     let datos = $('input[name="datos"]').val();
                     let facturacion = $('input[name="facturacion"]').val();
                     let productos = $('input[name="productos"]').val();
                     let impuestos = $('input[name="impuestos"]').val();
                     let notas = $('input[name="notas"]').val();
         
-                    // Clean and parse data
+                    // Log datos originales
+                    console.group('--- DATOS ORIGINALES ---');
+                    console.log('DATOS:', datos);
+                    console.log('FACTURACIÓN:', facturacion);
+                    console.log('PRODUCTOS:', productos);
+                    console.log('IMPUESTOS:', impuestos);
+                    console.log('NOTAS:', notas);
+                    console.groupEnd();
+        
+                    // Función para limpiar y parsear JSON
                     const cleanAndParse = (jsonStr) => {
                         if (!jsonStr) return [];
-                        // Remove escaped quotes and decode HTML entities
+                        console.group('Procesando JSON String:');
+                        console.log('Original:', jsonStr);
+                        
+                        // Limpiar string JSON
                         let cleaned = jsonStr
                             .replace(/&quot;/g, '"')
                             .replace(/&#34;/g, '"')
                             .replace(/\\/g, '');
-                        return JSON.parse(cleaned);
+                        console.log('Limpio:', cleaned);
+                        
+                        // Parsear JSON
+                        let parsed = JSON.parse(cleaned);
+                        console.log('Parseado:', JSON.stringify(parsed, null, 2));
+                        console.groupEnd();
+                        return parsed;
                     };
         
-                    // Create form data object
+                    // Crear objeto de datos
                     const formData = {
                         datos: cleanAndParse(datos),
                         facturacion: cleanAndParse(facturacion),
@@ -277,7 +295,12 @@
                         notas: cleanAndParse(notas)
                     };
         
-                    // Send AJAX request
+                    // Log datos finales
+                    console.group('--- DATOS A ENVIAR ---');
+                    console.log(JSON.stringify(formData, null, 2));
+                    console.groupEnd();
+        
+                    // Enviar petición AJAX
                     $.ajax({
                         url: "{{ url_for('xml_upload.export_data') }}",
                         type: 'POST',
@@ -294,6 +317,7 @@
                             }, 500);
                         },
                         error: function(xhr) {
+                            console.error('Error en petición:', xhr);
                             const errorMsg = xhr.responseJSON?.message || 'Error al guardar los datos';
                             $('#mensajes').html(`
                                 <div class="alert alert-error">
@@ -307,6 +331,7 @@
                     });
                 } catch (e) {
                     console.error('Error procesando datos:', e);
+                    console.error('Stack:', e.stack);
                     $('#mensajes').html(`
                         <div class="alert alert-error">
                             Error procesando datos: ${e.message}
@@ -318,6 +343,6 @@
                 }
             });
         });
-        </script>
+    </script>
 </body>
 </html>

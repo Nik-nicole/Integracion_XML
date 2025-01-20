@@ -21,28 +21,27 @@ xml_upload_bp = Blueprint('xml_upload', __name__)
 def upload_xml():
     if request.method == 'POST':
         try:
-            # Validar archivo
             if 'xml_file' not in request.files:
                 logger.warning('No se seleccionó archivo')
-                return jsonify({
-                    'status': 'error',
-                    'message': 'No se seleccionó ningún archivo'
-                }), 400
+                return render_template('upload_xml.html', 
+                                     error='No se seleccionó ningún archivo',
+                                     datos=None, facturacion=None, 
+                                     productos=None, impuestos=None, notas=None)
             
             file = request.files['xml_file']
             if file.filename == '':
                 logger.warning('Nombre de archivo vacío')
-                return jsonify({
-                    'status': 'error',
-                    'message': 'No se seleccionó un archivo'
-                }), 400
+                return render_template('upload_xml.html', 
+                                     error='No se seleccionó un archivo',
+                                     datos=None, facturacion=None, 
+                                     productos=None, impuestos=None, notas=None)
 
             # Procesar archivo
             file_content = BytesIO(file.read())
             datos, facturacion, productos, impuestos, notas = parse_xml(file_content)
             
-            # Limpiar y formatear datos
-            datos = [{
+            # Procesar datos directamente sin JSON intermedio
+            datos_clean = [{
                 'company_id': str(d['company_id']).strip(),
                 'registration_name': str(d['registration_name']).strip(),
                 'tax_level_code': str(d['tax_level_code']).strip(),
@@ -54,9 +53,9 @@ def upload_xml():
                 'country_name': str(d['country_name']).strip(),
                 'telephone': str(d['telephone']).strip(),
                 'electronic_mail': str(d['electronic_mail']).strip()
-            } for d in (datos or [])]
+            } for d in datos] if datos else []
 
-            facturacion = [{
+            facturacion_clean = [{
                 'document_id': str(f['document_id']).strip(),
                 'uuid': str(f['uuid']).strip(),
                 'issue_date': datetime.strptime(f['issue_date'], '%Y-%m-%d').strftime('%Y-%m-%d'),
@@ -67,9 +66,9 @@ def upload_xml():
                 'line_count_numeric': int(float(f['line_count_numeric'])),
                 'supplier_id': str(f['supplier_id']).strip(),
                 'customer_id': str(f['customer_id']).strip()
-            } for f in (facturacion or [])]
+            } for f in facturacion] if facturacion else []
 
-            productos = [{
+            productos_clean = [{
                 'nro': int(p['nro']),
                 'codigo': str(p['codigo']).strip(),
                 'descripcion': str(p['descripcion']).strip(),
@@ -81,53 +80,38 @@ def upload_xml():
                 'recargo_detalle': float(p['recargo_detalle']),
                 'iva': float(p['iva']),
                 'inc': float(p['inc'])
-            } for p in (productos or [])]
+            } for p in productos] if productos else []
 
-            # Eliminar impuestos duplicados
-            impuestos_unicos = []
-            impuestos_vistos = set()
-            for imp in impuestos:
-                key = f"{imp['tax_scheme_id']}_{imp['taxable_amount']}_{imp['tax_amount']}"
-                if key not in impuestos_vistos:
-                    impuestos_vistos.add(key)
-                    impuestos_unicos.append({
-                        'taxable_amount': float(imp['taxable_amount']),
-                        'tax_amount': float(imp['tax_amount']),
-                        'tax_percent': float(imp['tax_percent']),
-                        'tax_scheme_id': str(imp['tax_scheme_id']).strip(),
-                        'tax_scheme_name': str(imp['tax_scheme_name']).strip()
-                    })
+            # Procesar impuestos sin variable adicional
+            impuestos_clean = [{
+                'taxable_amount': float(imp['taxable_amount']),
+                'tax_amount': float(imp['tax_amount']),
+                'tax_percent': float(imp['tax_percent']),
+                'tax_scheme_id': str(imp['tax_scheme_id']).strip(),
+                'tax_scheme_name': str(imp['tax_scheme_name']).strip()
+            } for imp in impuestos] if impuestos else []
 
-            notas = [{
-                'nota': str(n['nota']).strip()
-            } for n in (notas or [])]
+            notas_clean = [{'nota': str(n['nota']).strip()} for n in notas] if notas else []
 
-            response_data = {
-                'status': 'success',
-                'message': 'XML procesado correctamente',
-                'data': {
-                    'datos': datos,
-                    'facturacion': facturacion,
-                    'productos': productos,
-                    'impuestos': impuestos_unicos,
-                    'notas': notas
-                }
-            }
-
-            return jsonify(response_data), 200
+            return render_template('upload_xml.html',
+                                datos=datos_clean,
+                                facturacion=facturacion_clean,
+                                productos=productos_clean,
+                                impuestos=impuestos_clean,
+                                notas=notas_clean,
+                                success='XML procesado correctamente')
 
         except Exception as e:
             logger.error(f"Error durante el procesamiento: {str(e)}")
-            return jsonify({
-                'status': 'error',
-                'message': f'Error durante el procesamiento: {str(e)}'
-            }), 500
+            return render_template('upload_xml.html', 
+                                error=f'Error durante el procesamiento: {str(e)}',
+                                datos=None, facturacion=None, 
+                                productos=None, impuestos=None, notas=None)
 
-    # Respuesta para GET
-    return jsonify({
-        'status': 'info',
-        'message': 'Usar método POST para procesar archivo XML'
-    }), 200
+    return render_template('upload_xml.html',
+                         datos=None, facturacion=None, 
+                         productos=None, impuestos=None, notas=None)
+    
         
 @xml_upload_bp.route('/export_data', methods=['POST'])
 def export_data():
