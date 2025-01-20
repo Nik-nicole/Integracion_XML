@@ -7,7 +7,7 @@ informacion_terceros_service = BaseService(InformacionTerceros)
 
 informacion_terceros = Blueprint('informacion_terceros', __name__, url_prefix='/informacion_terceros')
 
-@informacion_terceros.route('/', methods=['GET'])
+@informacion_terceros.route('/', methods=['GET']) 
 def get_all():
     informacion_terceros = informacion_terceros_service.get_all()
     return jsonify([{

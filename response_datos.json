@@ -1,0 +1,76 @@
+{
+    "datos": [
+        {
+            "address": "CR 48    181   13 P 1",
+            "city_name": "Bogotá, D.c.",
+            "company_id": "901402530",
+            "country": "CO",
+            "country_name": "Colombia",
+            "country_subentity": "Bogotá",
+            "country_subentity_code": "11",
+            "electronic_mail": "etc.line.col@gmail.com",
+            "registration_name": "ETC LINE SAS",
+            "tax_level_code": "O-23",
+            "telephone": "3015471832"
+        },
+        {
+            "address": "CR 69 BIS 24 31 SUR",
+            "city_name": "Bogotá, D.c.",
+            "company_id": "900339362",
+            "country": "CO",
+            "country_name": "Colombia",
+            "country_subentity": "Bogotá",
+            "country_subentity_code": "11",
+            "electronic_mail": "proveedores-colombia@soudal.com",
+            "registration_name": "SOUDAL COLOMBIA SAS",
+            "tax_level_code": "O-23;R-99-PN",
+            "telephone": "6019260199"
+        }
+    ],
+    "facturacion": [
+        {
+            "customer_id": "900339362",
+            "document_currency_code": "COP",
+            "document_id": "ETC59",
+            "due_date": "2024-10-28",
+            "invoice_type_code": "01",
+            "issue_date": "2024-10-28",
+            "issue_time": "13:59:57-05:00",
+            "line_count_numeric": 1,
+            "supplier_id": "901402530",
+            "uuid": "0dda507be73ebe506416db20982516e4668ef5c80cfcb108054eb2bdd2aec94a97b2943cd83995adb8bcee4238d53039"
+        }
+    ],
+    "impuestos": [
+        {
+            "tax_amount": 731500.0,
+            "tax_percent": 19.0,
+            "tax_scheme_id": "01",
+            "tax_scheme_name": "IVA",
+            "taxable_amount": 3850000.0
+        }
+    ],
+    "notas": [
+        {
+            "nota": "CURSO EXCEL INTERMEDIO-AVANZADO 11 PERSONAS $350.000 C/U"
+        },
+        {
+            "nota": "Linea de negocio: ADMINISTRATIVA"
+        }
+    ],
+    "productos": [
+        {
+            "cantidad": 11.0,
+            "codigo": "86111502",
+            "descripcion": "Servicios de enseñanza a distancia",
+            "descuento_detalle": 0.0,
+            "inc": 0.0,
+            "iva": 731500.0,
+            "nro": 1,
+            "precio_unitario": 350000.0,
+            "precio_venta": 3850000.0,
+            "recargo_detalle": 0.0,
+            "um": "11.000000"
+        }
+    ]
+}
